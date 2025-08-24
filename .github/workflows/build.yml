@@ -15,10 +15,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf make
 
+      - name: Add arm-none aliases (quick fix)
+        run: |
+          set -e
+          for x in gcc g++ ar as ld strip objcopy objdump ranlib; do
+            src="$(command -v arm-linux-gnueabihf-$x)"
+            [ -n "$src" ] || { echo "missing arm-linux-gnueabihf-$x"; exit 1; }
+            sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
+          done
+
       - name: Build
         run: |
           make clean || true
-          make -j"$(nproc)" CROSS_COMPILE=arm-linux-gnueabihf-
+          make -j"$(nproc)"
 
       - name: Upload MiSTer
         uses: actions/upload-artifact@v4
