@@ -55,7 +55,7 @@ jobs:
             sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
           done
 
-      # 4) 编译：加 -D_7ZIP_ST，避免依赖 LzFindMt.h / 线程实现
+      # 4) 编译：加 -D_7ZIP_ST，并补上 libchdr 的包含目录
       - name: Build
         env:
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
@@ -66,11 +66,12 @@ jobs:
           FT_LIBS="$(pkg-config --libs freetype2)"
           echo "freetype2 cflags: ${FT_CFLAGS}"
           echo "freetype2 libs:   ${FT_LIBS}"
+          CHDR_INC="-Ilib/libchdr/include -Ilib/libchdr"
           make -j"$(nproc)" \
             CROSS_COMPILE=arm-linux-gnueabihf- \
-            CFLAGS="$CFLAGS $FT_CFLAGS -D_7ZIP_ST" \
-            CXXFLAGS="$CXXFLAGS $FT_CFLAGS -D_7ZIP_ST" \
-            CPPFLAGS="$CPPFLAGS $FT_CFLAGS -D_7ZIP_ST" \
+            CFLAGS="$CFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC" \
+            CXXFLAGS="$CXXFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC" \
+            CPPFLAGS="$CPPFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC" \
             LIBS="$LIBS $FT_LIBS" \
             LDLIBS="$LDLIBS $FT_LIBS"
 
