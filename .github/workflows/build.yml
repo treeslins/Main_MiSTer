@@ -1,0 +1,27 @@
+name: build-mister
+
+on:
+  push: { branches: [ master ] }   # 只在 master 有提交时触发
+  workflow_dispatch:               # 也可在 Actions 页面手动点“Run workflow”
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    env:
+      CROSS_COMPILE: arm-linux-gnueabihf-
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf make
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Upload MiSTer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiSTer
+          path: MiSTer
