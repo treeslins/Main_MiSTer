@@ -19,7 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1) amd64 用 archive/security，armhf 用 ports（避免 404）
+      # APT 源：amd64 走 archive/security；armhf 走 ports（避免 404）
       - name: Configure APT sources for multiarch
         run: |
           set -e
@@ -36,7 +36,6 @@ jobs:
           EOF'
           sudo apt-get update
 
-      # 2) 交叉编译器 + FreeType（armhf）
       - name: Install toolchains and deps
         run: |
           set -e
@@ -45,7 +44,7 @@ jobs:
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
             libfreetype6-dev:armhf zlib1g-dev:armhf libpng-dev:armhf libbz2-dev:armhf
 
-      # 3) 兼容别名：如 Makefile 写死 arm-none- 前缀
+      # 某些 Makefile 写死了 arm-none- 前缀，做兼容别名
       - name: Add arm-none aliases (compat)
         run: |
           set -e
@@ -55,13 +54,44 @@ jobs:
             sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
           done
 
-      # 4) 编译：补全所有需要的头文件搜索路径
       - name: Build
         env:
+          # 让 pkg-config 指向 armhf 的 .pc
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
-          set -e
+          set -euo pipefail
           make clean || true
 
-          # freetype flags
-          FT_CFLAGS="$(pkg-config --cflags f_
+          # 单行赋值，避免换行截断
+          FT_CFLAGS="$(pkg-config --cflags freetype2)"; FT_LIBS="$(pkg-config --libs freetype2)"
+          CHDR_INC="-Ilib/libchdr/include -Ilib/libchdr"
+          LZMA_INC="-Ilib/lzma -Ilib/lzma/C -Ilib/lzma/SDK/C"
+          MINIZ_INC="-Ilib/miniz -Ilib/miniz/include"
+
+          echo "FT_CFLAGS=${FT_CFLAGS}"
+          echo "FT_LIBS=${FT_LIBS}"
+
+          make -j"$(nproc)" \
+            CROSS_COMPILE=arm-linux-gnueabihf- \
+            CFLAGS="$CFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC $LZMA_INC $MINIZ_INC" \
+            CXXFLAGS="$CXXFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC $LZMA_INC $MINIZ_INC" \
+            CPPFLAGS="$CPPFLAGS $FT_CFLAGS -D_7ZIP_ST $CHDR_INC $LZMA_INC $MINIZ_INC" \
+            LIBS="$LIBS $FT_LIBS" \
+            LDLIBS="$LDLIBS $FT_LIBS"
+
+      - name: Show result
+        run: |
+          file ./MiSTer || true
+          ls -lh ./MiSTer || (echo "Build did not produce MiSTer binary" && exit 1)
+
+      - name: Zip artifact
+        run: zip -9 MiSTer-${{ github.ref_name }}-${{ github.sha }}.zip MiSTer
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MiSTer-${{ github.ref_name }}
+          path: |
+            MiSTer
+            MiSTer-*.zip
+          retention-days: 14
