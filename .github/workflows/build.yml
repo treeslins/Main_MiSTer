@@ -59,7 +59,7 @@ jobs:
           # 让 pkg-config 指向 armhf 的 .pc
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
-          set -euo pipefail
+          set -eo pipefail
           make clean || true
 
           # 单行赋值，避免换行截断
