@@ -1,28 +1,54 @@
 name: build-mister
 
 on:
-  push: { branches: [ master, cjk-osd ] }
+  push:
+    branches: [ master, cjk-osd ]   # 如只需 master，可改成 [ master ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Install deps (armhf)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 为 armhf 增加 ports 源并安装交叉编译器 + freetype 开发包（armhf）
+      - name: Install deps (armhf via ubuntu-ports)
         run: |
           set -e
           sudo dpkg --add-architecture armhf
+          sudo tee /etc/apt/sources.list.d/armhf-ports.list >/dev/null <<'EOF'
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-updates main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-backports main universe multiverse restricted
+          deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports jammy-security main universe multiverse restricted
+          EOF
           sudo apt-get update
           sudo apt-get install -y \
             make pkg-config \
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
-            libfreetype6-dev:armhf zlib1g-dev:armhf libpng-dev:armhf
+            libfreetype6-dev:armhf zlib1g-dev:armhf libpng-dev:armhf libbz2-dev:armhf
+
+      # 有些 Makefile 写死了 arm-none-linux-gnueabihf-*，做一组兼容别名到系统已安装的工具
+      - name: Add arm-none aliases (compat)
+        run: |
+          set -e
+          for x in gcc g++ ar as ld strip objcopy objdump ranlib nm; do
+            src="$(command -v arm-linux-gnueabihf-$x)"
+            [ -n "$src" ] || { echo "missing arm-linux-gnueabihf-$x"; exit 1; }
+            sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
+          done
 
       - name: Build
         env:
-          # 让 pkg-config 查 armhf 的 .pc（而不是宿主 x86）
+          # 让 pkg-config 指向 armhf 的 .pc，获取 freetype 的编译/链接参数
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
           set -e
@@ -32,14 +58,28 @@ jobs:
           echo "freetype2 cflags: ${FT_CFLAGS}"
           echo "freetype2 libs:   ${FT_LIBS}"
           make -j"$(nproc)" \
+            CROSS_COMPILE=arm-linux-gnueabihf- \
             CFLAGS="$CFLAGS $FT_CFLAGS" \
             CXXFLAGS="$CXXFLAGS $FT_CFLAGS" \
             CPPFLAGS="$CPPFLAGS $FT_CFLAGS" \
             LIBS="$LIBS $FT_LIBS" \
             LDLIBS="$LDLIBS $FT_LIBS"
 
-      - name: Upload MiSTer
+      - name: Show result
+        run: |
+          file ./MiSTer || true
+          ls -lh ./MiSTer || (echo "Build did not produce MiSTer binary" && exit 1)
+
+      - name: Zip artifact
+        run: |
+          set -e
+          zip -9 MiSTer-${{ github.ref_name }}-${{ github.sha }}.zip MiSTer
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MiSTer
-          path: MiSTer
+          name: MiSTer-${{ github.ref_name }}
+          path: |
+            MiSTer
+            MiSTer-*.zip
+          retention-days: 14
