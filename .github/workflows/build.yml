@@ -1,8 +1,8 @@
 name: build-mister
 
 on:
-  push: { branches: [ master ] }   # 只在 master 有提交时触发
-  workflow_dispatch:               # 也可在 Actions 页面手动点“Run workflow”
+  push: { branches: [ master, cjk-osd ] }
+  workflow_dispatch:
 
 jobs:
   build:
