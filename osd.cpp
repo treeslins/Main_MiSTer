@@ -45,6 +45,7 @@ as rotated copies of the first 128 entries.  -- AMR
 #include "logo.h"
 #include "user_io.h"
 #include "hardware.h"
+#include "font.h"
 #include "profiling.h"
 
 #include "support.h"
@@ -156,12 +157,13 @@ void OsdSetTitle(const char *s, int a)
 	// Compose the title, condensing character gaps
 	arrow = a;
 	int zeros = 0;
+	uint fixedHeight = 128;
 	uint i = 0, j = 0;
 	uint outp = 0;
 	while (1)
 	{
 		int c = s[i++];
-		if (c && (outp<OSDHEIGHT-8))
+		if (c && (outp<fixedHeight-8))
 		{
 			unsigned char *p = &charfont[c][0];
 			for (j = 0; j<8; ++j)
@@ -182,19 +184,19 @@ void OsdSetTitle(const char *s, int a)
 		}
 		else break;
 	}
-	for (i = outp; i<OSDHEIGHT; i++)
+	for (i = outp; i<fixedHeight; i++)
 	{
 		titlebuffer[i] = 0;
 	}
 
 	// Now centre it:
-	uint c = (OSDHEIGHT - 1 - outp) / 2;
+	uint c = (fixedHeight - 1 - outp) / 2;
 	memmove(titlebuffer + c, titlebuffer, outp);
 
 	for (i = 0; i<c; ++i) titlebuffer[i] = 0;
 
 	// Finally rotate it.
-	for (i = 0; i<OSDHEIGHT; i += 8)
+	for (i = 0; i<fixedHeight; i += 8)
 	{
 		unsigned char tmp[8];
 		rotatechar(&titlebuffer[i], tmp);
@@ -244,9 +246,10 @@ static void draw_title(const unsigned char *p)
 }
 
 // write a null-terminated string <s> to the OSD buffer starting at line <n>
-void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv)
+void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv, bool is_lower_part)
 {
-	//printf("OsdWriteOffset(%d)\n", n);
+	// printf("OsdWriteOffset(%d)\n", n);
+
 	unsigned short i;
 	unsigned char b;
 	const unsigned char *p;
@@ -269,6 +272,8 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 
 	unsigned char xormask = 0;
 	unsigned char xorchar = 0;
+
+	int len_utf8;
 
 	i = 0;
 	// send all characters in string to OSD
@@ -321,8 +326,11 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 		}
 		else
 		{
-			b = *s++;
+			b = *s;
+
 			if (!b) break;
+
+			len_utf8 = utf8_charlen(b);
 
 			if (b == 0xb)
 			{
@@ -345,7 +353,20 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 			else if (i<(linelimit - 8))
 			{  // normal character
 				unsigned char c;
-				p = &charfont[b][0];
+				if (len_utf8 == 1)
+				{
+					// ASCII and MiSTer special bitmap character
+					if (is_lower_part)
+						p = &charfont[b][0];
+					else // Show nothing on upper section
+						p = &charfont[0x00][0];
+				}
+				else
+				{
+					// UTF-8 multibyte character
+					freetype_render((unsigned char *)s, is_lower_part);
+					p = &rendered_font[0];
+				}
 				for (c = 0; c<8; c++) {
 					char bg = usebg ? framebuffer[n][i+c-22] : 0;
 					osdbuf[osdbufpos++] = (((*p++ << offset)&stipplemask) ^ xormask ^ xorchar) | bg;
@@ -353,6 +374,8 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 				}
 				i += 8;
 			}
+
+			s += len_utf8;
 		}
 	}
 
@@ -597,6 +620,8 @@ static void print_line(unsigned char line, const char *hdr, const char *text, un
 void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx)
 {
 	// this function is called periodically when a string longer than the window is displayed.
+
+	// need to handle utf8 multibyte *str
 
 #define BLANKSPACE 10 // number of spaces between the end and start of repeated name
 
