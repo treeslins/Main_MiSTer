@@ -19,9 +19,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 1) 启用 armhf 架构并重写 sources.list：
-      #    - amd64 用 archive/security（加 [arch=amd64]）
-      #    - armhf 全部走 ports.ubuntu.com（加 [arch=armhf]）
+      # 1) amd64 用 archive/security，armhf 用 ports（避免 404）
       - name: Configure APT sources for multiarch
         run: |
           set -e
@@ -38,7 +36,7 @@ jobs:
           EOF'
           sudo apt-get update
 
-      # 2) 安装交叉编译器与 FreeType（armhf）
+      # 2) 交叉编译器 + FreeType（armhf）
       - name: Install toolchains and deps
         run: |
           set -e
@@ -47,7 +45,7 @@ jobs:
             gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
             libfreetype6-dev:armhf zlib1g-dev:armhf libpng-dev:armhf libbz2-dev:armhf
 
-      # 3) 兼容别名：如 Makefile 写死 arm-none-linux-gnueabihf-*，映射到系统已有工具
+      # 3) 兼容别名：如 Makefile 写死 arm-none- 前缀
       - name: Add arm-none aliases (compat)
         run: |
           set -e
@@ -57,7 +55,7 @@ jobs:
             sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
           done
 
-      # 4) 编译：通过 pkg-config 拿到 freetype2 的头文件与库
+      # 4) 编译：加 -D_7ZIP_ST，避免依赖 LzFindMt.h / 线程实现
       - name: Build
         env:
           PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
@@ -70,9 +68,9 @@ jobs:
           echo "freetype2 libs:   ${FT_LIBS}"
           make -j"$(nproc)" \
             CROSS_COMPILE=arm-linux-gnueabihf- \
-            CFLAGS="$CFLAGS $FT_CFLAGS" \
-            CXXFLAGS="$CXXFLAGS $FT_CFLAGS" \
-            CPPFLAGS="$CPPFLAGS $FT_CFLAGS" \
+            CFLAGS="$CFLAGS $FT_CFLAGS -D_7ZIP_ST" \
+            CXXFLAGS="$CXXFLAGS $FT_CFLAGS -D_7ZIP_ST" \
+            CPPFLAGS="$CPPFLAGS $FT_CFLAGS -D_7ZIP_ST" \
             LIBS="$LIBS $FT_LIBS" \
             LDLIBS="$LDLIBS $FT_LIBS"
 
