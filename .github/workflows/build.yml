@@ -10,24 +10,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cross toolchain
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf make
-
-      - name: Add arm-none aliases (quick fix)
+      - name: Install deps (armhf)
         run: |
           set -e
-          for x in gcc g++ ar as ld strip objcopy objdump ranlib; do
-            src="$(command -v arm-linux-gnueabihf-$x)"
-            [ -n "$src" ] || { echo "missing arm-linux-gnueabihf-$x"; exit 1; }
-            sudo ln -sf "$src" /usr/bin/arm-none-linux-gnueabihf-$x
-          done
+          sudo dpkg --add-architecture armhf
+          sudo apt-get update
+          sudo apt-get install -y \
+            make pkg-config \
+            gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf \
+            libfreetype6-dev:armhf zlib1g-dev:armhf libpng-dev:armhf
 
       - name: Build
+        env:
+          # 让 pkg-config 查 armhf 的 .pc（而不是宿主 x86）
+          PKG_CONFIG_LIBDIR: /usr/lib/arm-linux-gnueabihf/pkgconfig:/usr/share/pkgconfig
         run: |
+          set -e
           make clean || true
-          make -j"$(nproc)"
+          FT_CFLAGS="$(pkg-config --cflags freetype2)"
+          FT_LIBS="$(pkg-config --libs freetype2)"
+          echo "freetype2 cflags: ${FT_CFLAGS}"
+          echo "freetype2 libs:   ${FT_LIBS}"
+          make -j"$(nproc)" \
+            CFLAGS="$CFLAGS $FT_CFLAGS" \
+            CXXFLAGS="$CXXFLAGS $FT_CFLAGS" \
+            CPPFLAGS="$CPPFLAGS $FT_CFLAGS" \
+            LIBS="$LIBS $FT_LIBS" \
+            LDLIBS="$LDLIBS $FT_LIBS"
 
       - name: Upload MiSTer
         uses: actions/upload-artifact@v4
