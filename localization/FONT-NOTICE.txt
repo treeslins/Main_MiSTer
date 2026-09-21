@@ -1,0 +1,5 @@
+MiSTer Chinese demo subset, derived from GNU Unifont 18.0.01.
+Copyright individual Unifont contributors.
+Source: https://unifoundry.com/pub/unifont/unifont-18.0.01/font-builds/unifont-18.0.01.hex.gz
+Font subset distributed under SIL OFL 1.1; see OFL-1.1.txt.
+Attribution: https://unifoundry.com/unifont/index.html

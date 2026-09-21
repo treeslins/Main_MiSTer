@@ -26,6 +26,10 @@ INCLUDE += -I./lib/libchdr/include
 INCLUDE += -I./lib/bluetooth
 INCLUDE += -I./lib/serial_server/library
 
+ifeq ($(ZH_DEMO),1)
+	INCLUDE += -DMISTER_ZH_DEMO
+endif
+
 BUILDDIR = bin
 
 PRJ = MiSTer

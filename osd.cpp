@@ -39,6 +39,7 @@ as rotated copies of the first 128 entries.  -- AMR
 #include <stdio.h>
 
 #include "osd.h"
+#include "zh_render.h"
 #include "cfg.h"
 #include "spi.h"
 
@@ -378,6 +379,24 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 		osdbuf[osdbufpos++] = xormask;
 		i += 22;
 	}
+}
+
+// Experimental two-row UTF-8 surface. Caller reserves both rows.
+bool OsdWriteZh(unsigned char n, const char *text, bool invert, bool stipple, unsigned scroll_pixels)
+{
+	if (!text || n + 1 >= osd_size || n + 1 >= 32) return false;
+	// The last row belongs to navigation arrows and the exit item.
+	if (n + 1 == osd_size - 1) return false;
+	uint8_t top[234], bottom[234];
+	ZhRender(text, top, bottom, sizeof(top), invert, stipple, scroll_pixels);
+	for (unsigned half=0; half<2; ++half) {
+		OsdWrite(n+half, "", invert);
+		osd_start(n+half);
+		osdbufpos += 22;
+		memcpy(osdbuf + osdbufpos, half ? bottom : top, sizeof(top));
+		osdbufpos += sizeof(top);
+	}
+	return true;
 }
 
 void OsdShiftDown(unsigned char n)

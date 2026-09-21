@@ -1,0 +1,40 @@
+name: Chinese OSD prototype
+on:
+  workflow_call:
+    inputs:
+      candidate:
+        type: string
+        required: true
+  workflow_dispatch:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate || github.sha }}
+          persist-credentials: false
+      - name: Check font and upstream merge behavior
+        run: |
+          python3 localization/generate_font.py --check
+          python3 tests/sync_test.py
+      - name: Test pixel renderer
+        run: |
+          g++ -std=c++14 -Wall -Wextra -fsanitize=address,undefined -I. tests/zh_render_test.cpp -o /tmp/zh-test
+          /tmp/zh-test
+      - name: Cross compile experimental binary
+        shell: bash
+        run: |
+          source setup_default_toolchain.sh
+          make ZH_DEMO=1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MiSTer-zh-experimental
+          path: |
+            bin/MiSTer
+            localization/
+            LICENSE

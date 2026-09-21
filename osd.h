@@ -20,6 +20,7 @@ void OsdSetArrow(int arrow);
 void OsdWrite(unsigned char n, const char *s="", unsigned char inver=0, unsigned char stipple=0, char usebg = 0, int maxinv = 32, int mininv = 0);
 void OsdWriteOffset(unsigned char n, const char *s, unsigned char inver, unsigned char stipple, char offset, char leftchar, char usebg = 0, int maxinv = 32, int mininv = 0); // Used for scrolling "Exit" text downwards...
 void OsdClear();
+bool OsdWriteZh(unsigned char n, const char *text, bool invert=false, bool stipple=false, unsigned scroll_pixels=0);
 void OsdEnable(unsigned char mode);
 void InfoEnable(int x, int y, int width, int height);
 void OsdDisable();
@@ -43,4 +44,3 @@ int OsdGetRotation(bool scaled);
 #define OsdIsBig (OsdGetSize()>8)
 
 #endif
-

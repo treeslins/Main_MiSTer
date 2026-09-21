@@ -7376,6 +7376,9 @@ void HandleUI(void)
 		reboot_req = 0;
 
 		while(m < OsdGetSize()-1) OsdWrite(m++, "");
+#ifdef MISTER_ZH_DEMO
+		OsdWriteZh(13, u8"中文测试 保存 设置 退出");
+#endif
 		OsdWrite(15, STD_EXIT, menusub == 6);
 		menustate = MENU_SYSTEM2;
 		break;
