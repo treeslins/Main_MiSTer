@@ -67,6 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ide.h"
 #include "profiling.h"
 #include "str_util.h"
+#include "zh_ui.h"
 #include "autofire.h"
 
 /*menu states*/
@@ -1324,6 +1325,16 @@ void HandleUI(void)
 		}
 	}
 
+	// Inspect text outside the Chinese viewport without changing core options.
+	const bool zh_pageable = menustate==MENU_SYSTEM2 || menustate==MENU_COMMON2 ||
+		menustate==MENU_MISC2 || menustate==MENU_GENERIC_MAIN2 ||
+		menustate==MENU_GENERIC_MAIN3 || menustate==MENU_MINIMIG_MAIN2 ||
+		menustate==MENU_ST_MAIN2 || menustate==MENU_ABOUT2 ||
+		menustate==MENU_SCRIPTS_PRE1;
+	if(OsdChinese() && zh_pageable && user_io_osd_is_visible() && (get_key_mod() & (LCTRL|RCTRL)) &&
+	   (c==KEY_PAGEUP || c==KEY_PAGEDOWN)) {
+		OsdChinesePage(c==KEY_PAGEUP?-1:1); c=0;
+	}
 	//prevent OSD control while script is executing on framebuffer
 	if ((!video_fb_state() || video_chvt(0) != 2) && !select_ini)
 	{
@@ -7376,9 +7387,6 @@ void HandleUI(void)
 		reboot_req = 0;
 
 		while(m < OsdGetSize()-1) OsdWrite(m++, "");
-#ifdef MISTER_ZH_DEMO
-		OsdWriteZh(13, u8"中文测试 保存 设置 退出");
-#endif
 		OsdWrite(15, STD_EXIT, menusub == 6);
 		menustate = MENU_SYSTEM2;
 		break;
@@ -8336,8 +8344,27 @@ void open_joystick_setup()
 	joymap_first = 1;
 }
 
+static std::string chinese_file_label(int index)
+{
+	auto item=flist_DirItem(index);
+	const char *name=item->altname;
+	if(item->de.d_type==DT_DIR && !strcmp(name,"..")) return u8"上级目录";
+	if(item->de.d_type==DT_DIR && (fs_Options & SCANO_CORES) && name[0]=='_') ++name;
+	std::string label=name;
+	if(item->de.d_type==DT_DIR) label=std::string(item->flags & DT_EXT_ZIP?"[ZIP] ":u8"[目录] ")+label;
+	else if(!cfg.rbf_hide_datecode && item->datecode[0]) label+=" "+std::string(item->datecode);
+	return label;
+}
+
 void ScrollLongName(void)
 {
+	if(OsdChinese()) {
+		if(flist_nDirEntries()) {
+			std::string label=chinese_file_label(flist_iSelectedEntry());
+			ScrollText(flist_iSelectedEntry()-flist_iFirstEntry(),label.c_str(),0,0,0,1,0,false);
+		}
+		return;
+	}
 	// this function is called periodically when file selection window is displayed
 	// it checks if predefined period of time has elapsed and scrolls the name if necessary
 
@@ -8375,6 +8402,23 @@ void ScrollLongName(void)
 // print directory contents
 void PrintDirectory(int expand)
 {
+	if(OsdChinese()) {
+		ScrollReset();
+		for(int i=0;i<OsdGetSize();++i) {
+			int k=flist_iFirstEntry()+i;
+			std::string label;
+			bool raw=true;
+			if(k<flist_nDirEntries()) label=chinese_file_label(k);
+			else if(!flist_nDirEntries() && i==0) { label="No files!"; raw=false; }
+			else if(!flist_nDirEntries() && home_dir && !filter[0]) {
+				if(i==1) { label="Missing directory:"; raw=false; }
+				if(i==2) label=home_dir;
+			}
+			char marker=(!i && k)?17:(i==OsdGetSize()-1 && k+1<flist_nDirEntries())?16:0;
+			OsdWriteOffset(i,label.c_str(),k==flist_iSelectedEntry() && k<flist_nDirEntries(),0,0,marker,0,32,0,!raw);
+		}
+		return;
+	}
 	char s[40];
 	ScrollReset();
 
@@ -8502,6 +8546,7 @@ void PrintDirectory(int expand)
 
 static void set_text(const char *message, unsigned char code)
 {
+	if(OsdChinese()) { OsdWriteText(message,code); return; }
 	char s[40];
 	int i = 0, l = 1;
 

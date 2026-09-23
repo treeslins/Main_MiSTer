@@ -115,6 +115,7 @@ typedef struct {
 	uint16_t hdmi_off;
 	uint32_t keyboard_as_joystick[256];
 	uint8_t sanity_check;
+	uint8_t osd_language; // 0: original English, 1: Simplified Chinese
 } cfg_t;
 
 extern cfg_t cfg;

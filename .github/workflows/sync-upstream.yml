@@ -63,6 +63,6 @@ jobs:
     if: needs.prepare.outputs.candidate != ''
     permissions:
       contents: read
-    uses: ./.github/workflows/zh-prototype.yml
+    uses: ./.github/workflows/zh-build.yml
     with:
       candidate: ${{ needs.prepare.outputs.candidate }}

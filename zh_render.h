@@ -5,6 +5,8 @@
 #include <string.h>
 #include "zh_font.h"
 
+const ZhGlyph *ZhFindGlyph(uint32_t code);
+
 // Explicit UTF-8 API: legacy OSD strings also contain single-byte icons.
 // Never apply this decoder to those strings implicitly.
 inline uint32_t ZhDecode(const char *&s)
@@ -30,25 +32,32 @@ inline uint32_t ZhDecode(const char *&s)
 // scroll_pixels is a viewport offset, never a byte offset into UTF-8.
 inline unsigned ZhRender(const char *text, uint8_t *top, uint8_t *bottom,
                          unsigned width, bool invert=false, bool stipple=false,
-                         unsigned scroll_pixels=0)
+                         unsigned scroll_pixels=0, const unsigned char (*icons)[8]=nullptr)
 {
     memset(top, invert?255:0, width);
     memset(bottom, invert?255:0, width);
     unsigned x=0;
+    bool toggle_inverse=false, toggle_stipple=false;
     while (*text) {
         uint32_t cp=ZhDecode(text);
-        const ZhGlyph *glyph=0;
-        for (const auto &g : zh_glyphs) if (g.code==cp) { glyph=&g; break; }
-        unsigned w=glyph?glyph->width:16;
+        if(cp==0xe00b) { toggle_stipple=!toggle_stipple; continue; }
+        if(cp==0xe00c) { toggle_inverse=!toggle_inverse; continue; }
+        bool icon=cp>=0xe000 && cp<=0xe0ff;
+        const ZhGlyph *glyph=ZhFindGlyph(cp);
+        unsigned w=icon?8:glyph?glyph->width:16;
         if (scroll_pixels>=w) { scroll_pixels-=w; continue; }
         unsigned start=scroll_pixels;
         scroll_pixels=0;
         if (w-start>width-x) break;
         for (unsigned c=start; c<w; ++c) {
             uint16_t bits=glyph?glyph->columns[c]:((c==0 || c==15)?0xffff:0x8001);
-            if (stipple) bits &= (x&1)?0xaaaa:0x5555;
-            top[x]=(uint8_t)bits ^ (invert?255:0);
-            bottom[x]=(uint8_t)(bits>>8) ^ (invert?255:0);
+            if(icon && icons) {
+                bits=0;
+                for(unsigned y=0;y<8;++y) if(icons[cp-0xe000][c]&(1u<<y)) bits|=3u<<(2*y);
+            }
+            if (stipple!=toggle_stipple) bits &= (x&1)?0xaaaa:0x5555;
+            top[x]=(uint8_t)bits ^ ((invert!=toggle_inverse)?255:0);
+            bottom[x]=(uint8_t)(bits>>8) ^ ((invert!=toggle_inverse)?255:0);
             ++x;
         }
     }

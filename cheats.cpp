@@ -324,13 +324,13 @@ void cheats_print()
 			if (len > 3 && !strncasecmp(s + len - 3, ".gg", 3)) len -= 3;
 			s[len] = 0;
 
-			if (len > 28)
+			if (!OsdChinese() && len > 28)
 			{
 				len = 27; // trim display length if longer than 30 characters
 				s[28] = 22;
 			}
 
-			s[29] = 0;
+			if(!OsdChinese()) s[29] = 0;
 
 			if (!i && k) leftchar = 17;
 			if ((i == OsdGetSize() - 1) && (k < cheats_available() - 1)) leftchar = 16;
@@ -338,6 +338,7 @@ void cheats_print()
 		else
 		{
 			memset(s, ' ', 32);
+			s[32]=0;
 		}
 
 		OsdWriteOffset(i, s, i == (iSelectedEntry - iFirstEntry), 0, 0, leftchar);
