@@ -9,6 +9,9 @@ script = Path(__file__).resolve().parents[1] / 'localization/prepare_sync.py'
 spec = importlib.util.spec_from_file_location('sync', script)
 sync = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sync)
+review_spec = importlib.util.spec_from_file_location('review', script.with_name('review_upstream.py'))
+review = importlib.util.module_from_spec(review_spec)
+review_spec.loader.exec_module(review)
 
 
 class MergeTests(unittest.TestCase):
@@ -70,6 +73,15 @@ class MergeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             sync.prepare('upstream', 'report.json')
         self.assertEqual(Path('menu').read_text(), 'unsaved work')
+
+    def test_upstream_review_lists_new_source_text(self):
+        self.git('checkout', 'upstream')
+        self.save('menu.cpp', '#include "menu.h"\nOsdWrite(0, "New menu option");\n')
+        self.git('checkout', 'chinese')
+        report = review.report('chinese', 'upstream')
+        self.assertIn('New menu option', report)
+        self.assertIn('menu.cpp:2', report)
+        self.assertNotIn('`menu.h`', report)
 
 
 if __name__ == '__main__':

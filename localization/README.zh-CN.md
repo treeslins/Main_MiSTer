@@ -14,13 +14,13 @@
 
 GitHub Actions 配置位于 `.github/workflows/zh-build.yml`，包含字体与词条的可复现检查、同步场景测试、Linux sanitizer 测试及 ARM 交叉编译。标准构建命令为 `source setup_default_toolchain.sh`，随后 `make`。
 
-2026-09-23 本地验证：使用与上游同版本的 GNU Arm 10.2-2020.11 工具链，完整编译链接 125 个源码／资源，生成 ARM ELF32 hard-float 主程序。主机像素与翻译测试、4 个 Git 合并场景测试通过。Windows 验证由 Python 驱动编译器；GitHub 的 Linux 构建与真机显示仍需对本次修改重新验证。
+2026-09-23 验证：使用与上游同版本的 GNU Arm 10.2-2020.11 工具链，完整编译链接 125 个源码／资源，生成 ARM ELF32 hard-float 主程序。主机像素与翻译测试、Git 合并和上游新增文字报告测试通过。GitHub 的 Linux 构建、sanitizer 测试与产物上传也已通过；真机显示仍需验证。
 
 真机测试前保留 SD 卡根目录原来的 `MiSTer` 文件。测试版主程序替换该文件；如果显示或启动异常，从电脑恢复备份即可。未经真机验证，不应作为日常稳定版分发。
 
 ## 上游自动同步
 
-`.github/workflows/sync-upstream.yml` 每日 UTC 03:23 检查上游，也支持手动运行。默认分支必须是包含中文修改的开发分支。
+`.github/workflows/sync-upstream.yml` 每日 UTC 03:23 检查上游，也支持手动运行。默认分支必须是包含中文修改的开发分支。每次发现上游更新时，工作流会把新增的 C/C++ 字符串常量列入候选 PR 和报告附件，供维护者检查是否需要补充中文词条。
 
 - 没有新提交：结束，不创建分支或 PR。
 - 正常合并：创建包含上游与中文修改的候选分支，发起草稿 PR；相同上游与基础版本不重复创建 PR。

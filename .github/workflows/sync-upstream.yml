@@ -34,6 +34,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch https://github.com/MiSTer-devel/Main_MiSTer.git master:refs/remotes/upstream/master
+          python3 localization/review_upstream.py --base HEAD --upstream refs/remotes/upstream/master --output "$RUNNER_TEMP/translation-review.md"
           python3 localization/prepare_sync.py --report "$RUNNER_TEMP/sync-report.json"
           state=$(jq -r .state "$RUNNER_TEMP/sync-report.json")
           if [ "$state" = conflict ]; then
@@ -51,13 +52,16 @@ jobs:
           existing=$(gh pr list --state all --head "$branch" --base "$BASE_BRANCH" --json number --jq length)
           if [ "$existing" = 0 ]; then
             printf '%s\n' 'Upstream updates merged into a candidate branch. Review menu changes and translation coverage before merging. The sync workflow builds this candidate separately; no automatic release or device update is performed.' > "$RUNNER_TEMP/pr-body.md"
+            cat "$RUNNER_TEMP/translation-review.md" >> "$RUNNER_TEMP/pr-body.md"
             gh pr create --draft --base "$BASE_BRANCH" --head "$branch" --title 'Review upstream update for Chinese OSD' --body-file "$RUNNER_TEMP/pr-body.md"
           fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: upstream-sync-report
-          path: ${{ runner.temp }}/sync-report.json
+          path: |
+            ${{ runner.temp }}/sync-report.json
+            ${{ runner.temp }}/translation-review.md
   build:
     needs: prepare
     if: needs.prepare.outputs.candidate != ''
