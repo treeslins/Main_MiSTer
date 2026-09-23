@@ -18,8 +18,11 @@
 void OsdSetTitle(const char *s, int arrow = 0);	// arrow > 0 = display right arrow in bottom right, < 0 = display left arrow
 void OsdSetArrow(int arrow);
 void OsdWrite(unsigned char n, const char *s="", unsigned char inver=0, unsigned char stipple=0, char usebg = 0, int maxinv = 32, int mininv = 0);
-void OsdWriteOffset(unsigned char n, const char *s, unsigned char inver, unsigned char stipple, char offset, char leftchar, char usebg = 0, int maxinv = 32, int mininv = 0); // Used for scrolling "Exit" text downwards...
+void OsdWriteOffset(unsigned char n, const char *s, unsigned char inver, unsigned char stipple, char offset, char leftchar, char usebg = 0, int maxinv = 32, int mininv = 0, bool translate = true);
 void OsdClear();
+bool OsdChinese();
+void OsdChinesePage(int direction);
+void OsdWriteText(const char *text, unsigned char code=0);
 void OsdEnable(unsigned char mode);
 void InfoEnable(int x, int y, int width, int height);
 void OsdDisable();
@@ -27,7 +30,7 @@ void OsdMenuCtl(int en);
 void OsdUpdate();
 void OSD_PrintInfo(const char *message, int *width, int *height, int frame = 0);
 void OsdDrawLogo(int row);
-void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx = 0);
+void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx = 0, bool translate = true);
 void ScrollReset(int idx = 0);
 void StarsInit();
 void StarsUpdate();
@@ -43,4 +46,3 @@ int OsdGetRotation(bool scaled);
 #define OsdIsBig (OsdGetSize()>8)
 
 #endif
-

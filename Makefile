@@ -26,6 +26,7 @@ INCLUDE += -I./lib/libchdr/include
 INCLUDE += -I./lib/bluetooth
 INCLUDE += -I./lib/serial_server/library
 
+
 BUILDDIR = bin
 
 PRJ = MiSTer
@@ -47,6 +48,7 @@ IMG =     $(wildcard *.png)
 IMLIB2_LIB  = -Llib/imlib2 -lfreetype -lbz2 -lpng16 -lz -lImlib2 -ldl
 
 OBJ	= $(C_SRC:%.c=$(BUILDDIR)/%.c.o) $(CPP_SRC:%.cpp=$(BUILDDIR)/%.cpp.o) $(IMG:%.png=$(BUILDDIR)/%.png.o)
+OBJ += $(BUILDDIR)/localization/zh_font.bin.o
 DEP	= $(C_SRC:%.c=$(BUILDDIR)/%.c.d) $(CPP_SRC:%.cpp=$(BUILDDIR)/%.cpp.d)
 
 DFLAGS	= $(INCLUDE) -D_7ZIP_ST -DPACKAGE_VERSION=\"1.3.3\" -DHAVE_LROUND -DHAVE_STDINT_H -DHAVE_STDLIB_H -DHAVE_SYS_PARAM_H -DENABLE_64_BIT_WORDS=0 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE -DVDATE=\"`date +"%y%m%d"`\"
@@ -88,6 +90,10 @@ $(BUILDDIR)/%.cpp.o: %.cpp
 $(BUILDDIR)/%.png.o: %.png
 	$(Q)$(info $<)
 	$(Q)$(LD) -r -b binary -o $@ $< 2>&1 | $(OUTPUT_FILTER)
+
+$(BUILDDIR)/localization/zh_font.bin.o: localization/zh_font.bin
+	@mkdir -p $(dir $@)
+	$(Q)$(LD) -r -b binary -o $@ $<
 
 ifneq ($(MAKECMDGOALS), clean)
 -include $(DEP)

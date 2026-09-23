@@ -1,0 +1,72 @@
+name: Prepare upstream update
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 3 * * *'
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  prepare:
+    if: github.repository != 'MiSTer-devel/Main_MiSTer'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      candidate: ${{ steps.candidate.outputs.ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Prepare candidate
+        id: candidate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch https://github.com/MiSTer-devel/Main_MiSTer.git master:refs/remotes/upstream/master
+          python3 localization/review_upstream.py --base HEAD --upstream refs/remotes/upstream/master --output "$RUNNER_TEMP/translation-review.md"
+          python3 localization/prepare_sync.py --report "$RUNNER_TEMP/sync-report.json"
+          state=$(jq -r .state "$RUNNER_TEMP/sync-report.json")
+          if [ "$state" = conflict ]; then
+            cat "$RUNNER_TEMP/sync-report.json" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$state" = unchanged ]; then exit 0; fi
+          branch=$(jq -r .branch "$RUNNER_TEMP/sync-report.json")
+          if ! git ls-remote --exit-code origin "refs/heads/$branch" >/dev/null; then
+            git push origin "HEAD:refs/heads/$branch"
+          fi
+          # Build the actual remote candidate, including any reviewer fixes.
+          git fetch origin "$branch"
+          echo "ref=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_OUTPUT"
+          existing=$(gh pr list --state all --head "$branch" --base "$BASE_BRANCH" --json number --jq length)
+          if [ "$existing" = 0 ]; then
+            printf '%s\n' 'Upstream updates merged into a candidate branch. Review menu changes and translation coverage before merging. The sync workflow builds this candidate separately; no automatic release or device update is performed.' > "$RUNNER_TEMP/pr-body.md"
+            cat "$RUNNER_TEMP/translation-review.md" >> "$RUNNER_TEMP/pr-body.md"
+            gh pr create --draft --base "$BASE_BRANCH" --head "$branch" --title 'Review upstream update for Chinese OSD' --body-file "$RUNNER_TEMP/pr-body.md"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-sync-report
+          path: |
+            ${{ runner.temp }}/sync-report.json
+            ${{ runner.temp }}/translation-review.md
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.candidate != ''
+    permissions:
+      contents: read
+    uses: ./.github/workflows/zh-build.yml
+    with:
+      candidate: ${{ needs.prepare.outputs.candidate }}

@@ -172,7 +172,7 @@ void recent_scroll_name()
 	len = strlen(name); // get name length
 
 	max_len = 30;
-	ScrollText(iSelectedEntry - iFirstEntry, name, 1, len, max_len, 1);
+	ScrollText(iSelectedEntry - iFirstEntry, name, 1, len, max_len, 1, 0, false);
 }
 
 void recent_print()
@@ -200,13 +200,13 @@ void recent_print()
 
 			s[len] = 0;
 
-			if (len > 28)
+			if (!OsdChinese() && len > 28)
 			{
 				len = 27; // trim display length if longer than 30 characters
 				s[28] = 22;
 			}
 
-			s[29] = 0;
+			if(!OsdChinese()) s[29] = 0;
 
 			if (!i && k) leftchar = 17;
 			if ((i == OsdGetSize() - 1) && (k < recent_available() - 1)) leftchar = 16;
@@ -216,9 +216,10 @@ void recent_print()
 		else
 		{
 			memset(s, ' ', 32);
+			s[32]=0;
 		}
 
-		OsdWriteOffset(i, s, i == (iSelectedEntry - iFirstEntry) && recent_available(), d, 0, leftchar);
+		OsdWriteOffset(i, s, i == (iSelectedEntry - iFirstEntry) && recent_available(), d, 0, leftchar, 0, 32, 0, false);
 	}
 }
 
