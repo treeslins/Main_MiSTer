@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '27 3 * * *'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/mister-cn-autobuild.yml'
+      - 'cn/**'
 
 concurrency:
   group: mister-cn-autobuild
@@ -111,6 +115,7 @@ jobs:
   publish:
     name: Publish distinct pre-release (only after green build)
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
