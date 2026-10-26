@@ -14,7 +14,7 @@ if text.count(needle)!=1:
     raise SystemExit("Upstream osd.v structure changed; refuse unsafe patch")
 insertion="""// CN_OSD240_WRITE_EXPERIMENT (not yet complete video integration).
 // This write-bank subsystem remains isolated from the legacy osd_buffer.
-// Pixel-clock access is now wired but scan coordinates are a fixed stub.
+// Pixel-clock readout now samples the real legacy OSD scan counters.\n// Existing output mux still selects only legacy pixels.
 wire cn240_enabled;
 wire cn240_write, cn240_header;
 wire [4:0] cn240_row;
@@ -28,7 +28,7 @@ wire cn240_video_pixel, cn240_video_active;
 // Display mux is NOT switched to this path until timing is validated.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
- .x(8'd0), .y(8'd0), .ram_data(cn240_video_read),
+ .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .ram_data(cn240_video_read),
  .ram_header(cn240_video_header), .ram_row(cn240_video_row),
  .ram_column(cn240_video_col), .pixel(cn240_video_pixel),
  .active(cn240_video_active)
@@ -51,10 +51,19 @@ cn_osd240_dualclock_ram cn240_bank (
 """
 # Intentionally guard the original display implementation untouched.
 text=text.replace(needle,insertion+"\n"+needle)
+# Move existing OSD scan counters from the local clocked block to module scope
+# so the independent experimental read path can observe their true values.
+marker="\treg [21:0] osd_vcnt;"
+marker2="\treg [21:0] osd_hcnt;"
+if text.count(marker)!=1 or text.count(marker2)!=1:
+    raise SystemExit("OSD scan-counter layout changed; refusing patch")
+text=text.replace(marker,"",1).replace(marker2,"",1)
+scope="reg        osd_enable;"
+text=text.replace(scope,"reg [21:0] osd_vcnt;\nreg [21:0] osd_hcnt;\n"+scope,1)
 p.write_text(text)
 q=root/"sys/sys.qip"
 q.write_text(q.read_text()+
  '\nset_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_spi_adapter.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_dualclock_ram.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n')
-print("Applied isolated SPI write-bank experiment; NO 240p video integration")
+print("Applied real scan-counter tap and dualclock RAM; legacy video output unchanged")
