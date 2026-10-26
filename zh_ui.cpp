@@ -242,20 +242,25 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			frame[(physical*2+1)*256+6+x]=(uint8_t)(bits>>8)^255;
 		}
 	}
-	// Page markers refer to logical row positions, including deliberate
-	// blank separators, rather than counting only nonempty labels.
-	unsigned logical_end=0;
-	unsigned upper=std::min(logical_rows,32u);
-	for(unsigned i=0;i<upper;++i)
+	// Match pagination indicators to the same compacted list as visible().
+	const unsigned upper=std::min(logical_rows,32u);
+	const bool pinned=upper && zh_footer_label(page.rows[upper-1]);
+	const int body_end=pinned?(int)upper-1:(int)upper;
+	const int slots=pinned?7:8;
+	int last_used=0, nonempty=0;
+	for(int i=0;i<body_end;++i) {
 		if(!page.rows[i].source.empty() || !page.rows[i].text.empty() || page.rows[i].invert)
-			logical_end=i+1;
-	const int body_slots=(upper && zh_footer_label(page.rows[upper-1]))?7:8;
-	unsigned body_end=(body_slots==7 && logical_end)?logical_end-1:logical_end;
-	if(icons && (page.first>0 || page.first+body_slots<(int)body_end)) {
+			last_used=i+1;
+	}
+	for(int i=0;i<last_used;++i)
+		if(page.rows[i].text.find_first_not_of(" \\t\\r\\n")!=std::string::npos ||
+		   page.rows[i].invert || page.rows[i].arrow)
+			++nonempty;
+	const int entries=(last_used>slots && nonempty>=slots)?nonempty:body_end;
+	if(icons && (page.first>0 || page.first+slots<entries)) {
 		for(unsigned x=0;x<8;++x) {
 			if(page.first>0) frame[6+x]=icons[17][x]^255;
-			if(page.first+body_slots<(int)body_end)
-				frame[15*256+6+x]=icons[16][x]^255;
+			if(page.first+slots<entries) frame[15*256+6+x]=icons[16][x]^255;
 		}
 	}
 }
