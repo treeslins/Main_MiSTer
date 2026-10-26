@@ -19,5 +19,12 @@ PY
 # and both newly referenced modules in iverilog.
 iverilog -g2012 -Wall -DMENU_CORE -s osd -o /tmp/cn-osd240-patched.vvp \
   "$root/sys/osd.v" "$root/sys/cn_osd240_spi_adapter.v" "$root/sys/cn_osd240_dualclock_ram.v" "$root/sys/cn_osd240_pixel.v"
+# Also elaborate the explicitly unsafe preview branch. This is a syntax
+# check ONLY; the shipped/default video output remains the original path.
+iverilog -g2012 -Wall -DMENU_CORE -DCN_OSD240_PREVIEW_UNSAFE -s osd \
+  -o /tmp/cn-osd240-preview.vvp \
+  "$root/sys/osd.v" "$root/sys/cn_osd240_spi_adapter.v" \
+  "$root/sys/cn_osd240_dualclock_ram.v" "$root/sys/cn_osd240_pixel.v"
+echo "PASS: explicitly gated preview video branch also elaborates."
 echo "PASS: upstream sys/osd.v parses and elaborates with 240p write bank."
 echo "NOT READY: video readout, ARM integration, clock-domain crossing, Quartus."
