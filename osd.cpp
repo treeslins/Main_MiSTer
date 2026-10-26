@@ -167,7 +167,11 @@ void OsdSetTitle(const char *s, int a)
 {
 	if(OsdChinese()) {
 		std::string title=ZhTranslate(s?s:"");
-		if(title!=zh_title) { zh_page.clear(); memset(zh_scroll_times,0,sizeof(zh_scroll_times)); }
+		// Each title announcement begins a menu page, even when two different
+		// pages translate to the same title. Never retain stale rows or focus.
+		zh_page.clear();
+		memset(zh_scroll_times, 0, sizeof(zh_scroll_times));
+		memset(zh_scroll_active, 0, sizeof(zh_scroll_active));
 		zh_title=title; arrow=a; zh_info=false; zh_dirty=true;
 		return;
 	}
