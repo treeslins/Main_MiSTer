@@ -225,6 +225,7 @@ void OsdSetTitle(const char *s, int a)
 
 void OsdSetArrow(int a)
 {
+	if (arrow != a) zh_dirty = true; // Repaint translated footer arrows.
 	arrow = a;
 }
 
@@ -465,7 +466,7 @@ void OSD_PrintInfo(const char *message, int *width, int *height, int frame)
 		unsigned count=std::min((unsigned)lines.size(),7u), pixels=8;
 		for(unsigned i=0;i<count;++i) pixels=std::max(pixels,ZhTextWidth(lines[i]));
 		*width=std::min(32u,(pixels+23)/8); *height=count*2+2;
-		memset(osdbuf,0,16*256);
+		memset(osdbuf,0,sizeof(osdbuf));
 		for(unsigned i=0;i<count;++i) {
 			uint8_t top[240],bottom[240];
 			ZhRender(lines[i].c_str(),top,bottom,240,false,false,0,charfont);
@@ -552,7 +553,7 @@ void OsdClear(void)
 	memset(zh_scroll_times,0,sizeof(zh_scroll_times));
 	memset(zh_scroll_active,0,sizeof(zh_scroll_active));
 	osdset = -1;
-	memset(osdbuf, 0, 16 * 256);
+	memset(osdbuf, 0, sizeof(osdbuf));
 }
 
 int OsdGetRotation(bool scaled)
@@ -767,7 +768,17 @@ void OsdUpdate()
 	PROFILE_FUNCTION();
 	if(OsdChinese() && !zh_info) zh_compose();
 	int n = is_menu() ? 19 : osd_size;
-	if(OsdChinese()) n=is_menu()?19:16;
+	if(OsdChinese()) {
+		n=is_menu()?19:16;
+		// Chinese renderer owns the first 16 physical rows. On 19-row
+		// menu cores, never transmit leftovers from a previous legacy OSD.
+		for (int i = 16; i < n; ++i) {
+			uint8_t *line = osdbuf + i * 256;
+			bool stale = false;
+			for (int col = 0; col < 256; ++col) if (line[col]) { stale = true; break; }
+			if (stale) { memset(line, 0, 256); osdset |= 1 << i; }
+		}
+	}
 	for (int i = 0; i < n; i++)
 	{
 		if (osdset & (1 << i))
