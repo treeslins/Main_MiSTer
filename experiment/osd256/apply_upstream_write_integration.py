@@ -60,6 +60,23 @@ if text.count(marker)!=1 or text.count(marker2)!=1:
 text=text.replace(marker,"",1).replace(marker2,"",1)
 scope="reg        osd_enable;"
 text=text.replace(scope,"reg [21:0] osd_vcnt;\nreg [21:0] osd_hcnt;\n"+scope,1)
+# Compile-time gated first video-mux integration. It stays OFF in the
+# ordinary upstream build; this only checks syntax of the opt-in branch.
+# The actual 224p/240p CRT-safe coordinate and CDC design is still pending.
+mux_anchor="\tordout1 <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},"
+assert text.count(mux_anchor)==1, "upstream video mixer changed"
+text=text.replace(mux_anchor, """\t// The existing legacy output remains the default in all builds.
+\t// ENABLE ONLY for waveform-level investigation; this does not yet
+\t// implement safe scan scaling or a synchronized mode transition.
+\t`ifdef CN_OSD240_PREVIEW_UNSAFE
+\tordout1 <= {{cn240_video_pixel, cn240_video_pixel, OSD_COLOR[2], din[23:19]},
+\t            {cn240_video_pixel, cn240_video_pixel, OSD_COLOR[1], din[15:11]},
+\t            {cn240_video_pixel, cn240_video_pixel, OSD_COLOR[0], din[7:3]}};
+\t`else
+"""+mux_anchor,1)
+end_anchor="\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"
+assert text.count(end_anchor)==1
+text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
 p.write_text(text)
 q=root/"sys/sys.qip"
 q.write_text(q.read_text()+
