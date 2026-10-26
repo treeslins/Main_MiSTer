@@ -32,3 +32,12 @@
 已完成：纯 Python 离线地址非重叠测试、240p 和 224p 尺寸预算；保留固定的 ZLabs 字体与原本可用中文版分支。
 
 未完成：Menu_MiSTer 的 Verilog patch、独立状态栏 bank/命令、ARM 与 FPGA 协议握手、Quartus 综合、真机菜单测试，**没有可以安装的新版 menu.rbf**。本 PR 继续保持草稿，不应安装或合并为正式版本。
+
+## 2026-10-26：新增可编译的扫描路径原型
+
+独立模块 `cn_osd240_ram.v` 已实现 26 条物理行的正文 RAM 和 3 行的状态栏 RAM；`cn_osd240_pixel.v` 新增了同步 RAM 读取流水线，将 240p 像素坐标映射为 24px 状态栏、208px 正文和 8px 底部留白；由 `tb_cn_osd240_pixel.v` 验证边界像素，`tb_cn_osd240_ram.v` 检查两区不互相覆盖。
+
+- GitHub Actions： https://github.com/treeslins/Main_MiSTer/actions/runs/40317406954
+- `iverilog -g2012` 和 `vvp` 的硬件逻辑仿真 **通过**。
+- **尚未接入**官方 `sys/osd.v` 及 `sys/sys_top.v`，尚无 Quartus 合成结果、`menu.rbf`、FPGA 与 ARM 新协议握手。离线像素映射通过不代表真实视频同步、任意视频模式或者 CRT 扫描一定正确。
+- 接入时应修改上游 Menu_MiSTer 工程，而不能把新 Verilog 文件误当成可以单独加载的 MiSTer 核心。
