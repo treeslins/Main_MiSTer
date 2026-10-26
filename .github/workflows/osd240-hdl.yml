@@ -34,6 +34,12 @@ jobs:
             experiment/osd256/cn_osd240_pixel.v \
             experiment/osd256/tb_cn_osd240_pixel.v
           vvp /tmp/cn-osd240/scan.vvp
+      - name: Compile and simulate gated experimental SPI decoder
+        run: |
+          iverilog -g2012 -Wall -s tb_bridge -o /tmp/cn-osd240/bridge.vvp \
+            experiment/osd256/cn_osd240_bridge.v \
+            experiment/osd256/tb_cn_osd240_bridge.v
+          vvp /tmp/cn-osd240/bridge.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
