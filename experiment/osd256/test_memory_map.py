@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
-"""Hardware-independent protocol prototype. NOT actual MiSTer SPI encoding.
-
-Raises on overlapping logical rows/status regions or commands with unsafe
-5-bit physical row aliasing. Does not synthesize FPGA logic.
-"""
+"""Offline address-design checks for CRT-safe OSD layouts. NOT FPGA firmware."""
 from dataclasses import dataclass
 
 WIDTH=256
 GLYPH_HEIGHT=16
-LOGICAL_LINES=16
-BODY_ROWS=LOGICAL_LINES*2
-BODY_BYTES=WIDTH*BODY_ROWS
-HEADER_ROWS=4  # include alignment space for 24px status header
-HEADER_BYTES=HEADER_ROWS*WIDTH
+STATUS_HEIGHT=24
+BOTTOM_MARGIN=8
+STATUS_STORAGE_ROWS=4   # 1024 bytes, aligned for special menu status
+TOTAL_ROWS_CRT_240=240
+TOTAL_ROWS_CRT_224=224
 
 @dataclass(frozen=True)
 class BankAddress:
@@ -21,33 +17,53 @@ class BankAddress:
     start: int
     stop: int
 
-def body(line: int, half: int) -> BankAddress:
-    assert 0 <= line < LOGICAL_LINES
-    assert half in (0,1)
-    row=line*2+half
-    off=row*WIDTH
-    return BankAddress('BODY',row,off,off+WIDTH)
+def geometry(screen_height: int):
+    if screen_height not in (224,240):
+        raise ValueError("supported design targets: 224p and 240p")
+    available=screen_height-STATUS_HEIGHT-BOTTOM_MARGIN
+    lines=available//GLYPH_HEIGHT
+    return {
+        "display_height":screen_height,
+        "status_height":STATUS_HEIGHT,
+        "logical_lines":lines,
+        "body_height":lines*GLYPH_HEIGHT,
+        "body_rows":lines*2,
+        "margin":screen_height-STATUS_HEIGHT-lines*GLYPH_HEIGHT,
+        "body_bytes":WIDTH*lines*2,
+        "header_bytes":WIDTH*STATUS_STORAGE_ROWS,
+    }
 
-def status(row: int) -> BankAddress:
-    assert 0 <= row < 3
-    off=BODY_BYTES + row*WIDTH
-    return BankAddress('HEADER',row,off,off+WIDTH)
+def verify(screen_height):
+    g=geometry(screen_height)
+    body_bytes=g["body_bytes"]
+    records=[]
+    for logical in range(g["logical_lines"]):
+        for half in (0,1):
+            row=logical*2+half
+            begin=row*WIDTH
+            records.append(BankAddress("BODY",row,begin,begin+WIDTH))
+    for row in range(3):
+        begin=body_bytes+row*WIDTH
+        records.append(BankAddress("HEADER",row,begin,begin+WIDTH))
+    for i,a in enumerate(records):
+        for b in records[i+1:]:
+            assert a.stop<=b.start or b.stop<=a.start,(a,b)
+    assert g["status_height"]+g["body_height"]+g["margin"] == screen_height
+    assert g["margin"] >= BOTTOM_MARGIN
+    assert g["body_rows"] <= 30
+    assert max(record.stop for record in records) <= body_bytes+g["header_bytes"]
+    # Reserve high line indices / a separate command bank for status, NOT
+    # existing legacy rows 16..18. Hardware bank handling is not yet written.
+    return g
 
 def main():
-    all_ranges = [body(line,half) for line in range(LOGICAL_LINES) for half in (0,1)]
-    all_ranges += [status(row) for row in range(3)]
-    assert len(all_ranges)==35
-    assert BODY_BYTES==8192 and HEADER_BYTES==1024
-    assert max(r.stop for r in all_ranges)==BODY_BYTES + 3*WIDTH
-    for index,a in enumerate(all_ranges):
-        assert a.stop-a.start==WIDTH
-        for b in all_ranges[index+1:]:
-            assert a.stop<=b.start or b.stop<=a.start, (a,b)
-    # Current 5-bit OSD command encodes only body rows.
-    assert body(15,1).row==31
-    assert max(status(x).start for x in range(3))>=8192
-    print('PASS: 32 body rows and 3 separate header rows; no SRAM collisions.')
-    print('NOT IMPLEMENTED: FPGA status bank command, read mux, handshake and Quartus build.')
+    for height in (TOTAL_ROWS_CRT_224,TOTAL_ROWS_CRT_240):
+        cfg=verify(height)
+        print(f"PASS {height}p: {cfg['logical_lines']} rows of 16px, "
+              f"{cfg['body_height']}px body + {STATUS_HEIGHT}px status + "
+              f"{cfg['margin']}px blank = {height}px; "
+              f"body SRAM {cfg['body_bytes']} bytes.")
+    print("No FPGA bitstream or ARM protocol implementation has been built.")
 
-if __name__=='__main__':
+if __name__=="__main__":
     main()
