@@ -69,6 +69,11 @@ jobs:
           /tmp/mister-cn-test dist/preview.pgm
           g++ -std=gnu++14 -Wall -Wextra -I. tests/zlabs_loader_test.cpp zh_font.cpp -o /tmp/zlabs-loader-test
           /tmp/zlabs-loader-test
+          g++ -std=gnu++14 -Wall -Wextra -Werror -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -I. \
+            tests/zh_osd_compat_test.cpp zh_ui.cpp zh_font.cpp \
+            -o /tmp/mister-cn-osd-compat-test
+          ASAN_OPTIONS=detect_leaks=1 /tmp/mister-cn-osd-compat-test
 
       - name: Restore cached ARM 10.2 toolchain
         id: compiler
