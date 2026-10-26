@@ -40,6 +40,15 @@ jobs:
             experiment/osd256/cn_osd240_bridge.v \
             experiment/osd256/tb_cn_osd240_bridge.v
           vvp /tmp/cn-osd240/bridge.vvp
+      - name: Simulate end-to-end extension command through displayed pixels
+        run: |
+          iverilog -g2012 -Wall -s tb_pipeline -o /tmp/cn-osd240/pipeline.vvp \
+            experiment/osd256/cn_osd240_bridge.v \
+            experiment/osd256/cn_osd240_ram.v \
+            experiment/osd256/cn_osd240_pixel.v \
+            experiment/osd256/cn_osd240_pipeline.v \
+            experiment/osd256/tb_cn_osd240_pipeline.v
+          vvp /tmp/cn-osd240/pipeline.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
