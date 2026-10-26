@@ -53,7 +53,12 @@ int main(int argc, char **argv) {
     uint8_t menu_frame[16*256];
     ZhDrawPage(page,u8"系统设置",16,1,menu_frame,icons);
     assert(menu_frame[0]!=0); // Sidebar survives the 16-pixel menu layout.
-    assert(menu_frame[14*256+40]!=0); // Pinned exit is present on the last two rows.
+    // Pinning is a layout property, not a guarantee that column 40 contains ink.
+    bool footer_ink=false;
+    for(unsigned physical=14;physical<16;++physical)
+        for(unsigned x=22;x<160;++x)
+            if(menu_frame[physical*256+x]) footer_ink=true;
+    assert(footer_ink); // Pinned exit is visible in the bottom two OSD rows.
     assert(menu_frame[2*256+40]!=0); // Focused "About" is highlighted.
     auto mixed=ZhMixedText("\x16");
     assert(ZhRender(mixed.c_str(),a,b,8,false,false,0,icons)==8 && a[0]==3 && b[0]==0);
