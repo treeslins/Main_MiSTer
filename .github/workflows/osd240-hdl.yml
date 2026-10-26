@@ -55,6 +55,19 @@ jobs:
             experiment/osd256/cn_osd240_spi_adapter.v \
             experiment/osd256/tb_cn_osd240_spi_adapter.v
           vvp /tmp/cn-osd240/spi.vvp
+      - name: Verify Quartus build guard and script syntax
+        run: |
+          bash -n experiment/osd256/build_menu_quartus.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          script = Path('experiment/osd256/build_menu_quartus.sh').read_text()
+          workflow = Path('.github/workflows/osd240-quartus.yml').read_text()
+          assert 'CN_OSD240_INTEGRATED' in script
+          assert 'quartus_sh --flow compile menu' in script
+          assert 'if-no-files-found: error' in workflow
+          assert 'self-hosted' in workflow
+          print('PASS: FPGA artifact cannot be published without integration and Quartus.')
+          PY
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
