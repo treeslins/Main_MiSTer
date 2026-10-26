@@ -1,0 +1,68 @@
+name: One-time pin exact misterfpga.cn font
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/font-pin-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  pin-exact-font:
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/mister-cn-auto-updater')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/mister-cn-auto-updater
+          persist-credentials: true
+      - name: Restore exact original font from verified GitHub artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cn/assets /tmp/mister-font-seed
+          if [ -f cn/assets/misterfpga.cn ]; then
+            echo "Fixed font already committed; no regeneration or changes."
+            sha256sum -c cn/assets/SHA256SUMS
+            exit 0
+          fi
+          gh run download 40275536023 --repo "$GITHUB_REPOSITORY" \
+            --name mister-cn-verified --dir /tmp/mister-font-seed
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          src = Path('/tmp/mister-font-seed/misterfpga.cn')
+          base = bytearray(src.read_bytes())
+          assert len(base) == 314376
+          assert hashlib.sha256(base).hexdigest() == '9a4bf7523e1facdaf9669eac554dfb6a94141bebb7bda26ecb1183fe924691c6'
+          patch = [[4266,132],[4308,132],[4346,132],[4388,132],[4427,132],[4466,132],
+                   [4508,128],[4546,132],[4588,132],[4666,128],
+                   [4708,128],[4865,130],[4869,130],[5025,132],[5029,130],
+                   [5065,132],[5069,128],[5105,130],[5109,130],
+                   [5145,128],[5149,128],[5265,136],[5266,64],
+                   [5268,64],[5269,136],[6988,132],[7028,132],
+                   [7068,132],[7108,128],[8268,132],[8308,128],
+                   [8348,128],[8785,128],[8789,136],
+                   [10065,64],[10069,66]]
+          for index, value in patch:
+              base[index] = value
+          target = bytes(base)
+          expected = 'cb8afcf32aabfc566ee0e39cd282c5d5a2c20049f2252dd26258696481c1a517'
+          assert hashlib.sha256(target).hexdigest() == expected
+          Path('cn/assets/misterfpga.cn').write_bytes(target)
+          Path('cn/assets/SHA256SUMS').write_text(
+              expected + '  cn/assets/misterfpga.cn\n', encoding='ascii')
+          PY
+          cp /tmp/mister-font-seed/LICENSE-OFL cn/assets/LICENSE-OFL
+          sha256sum -c cn/assets/SHA256SUMS
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add cn/assets/misterfpga.cn cn/assets/SHA256SUMS cn/assets/LICENSE-OFL
+          git commit -m 'assets: pin exact original misterfpga.cn bitmap font'
+          git push origin HEAD:feature/mister-cn-auto-updater
