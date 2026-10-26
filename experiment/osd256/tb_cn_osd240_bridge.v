@@ -40,6 +40,10 @@ module tb_bridge;
  if(header!==1 || row!==1 || col!==0) $fatal(1,"header bank wrong");
  payload(8'hA1);
  if(col!==1) $fatal(1,"header column not advancing");
+ // Simultaneous new command and stale payload must never write into RAM.
+ @(negedge clk); cmd=8'hA1;cv=1;data=8'h5a;dv=1;
+ #1; if(we!==0) $fatal(1,"command/data overlap permitted a stale write");
+ @(negedge clk);cv=0;dv=0;
  command(8'hBF);
  if(we!==0) $fatal(1,"invalid row unexpectedly written");
  $display("PASS: opt-in 240p protocol rejects invalid handshake and dispatches banked writes");
