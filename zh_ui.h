@@ -15,6 +15,8 @@ struct ZhRow {
     int mininv=0, maxinv=32;
     unsigned scroll=0;
     unsigned char arrow=0;
+    unsigned char vertical_shift=0;
+    bool use_background=false;
 };
 
 // Logical row identities remain unchanged. The physical viewport fits the
@@ -25,9 +27,11 @@ struct ZhPage {
     bool manual=false;
     void clear();
     void set(unsigned row, const char *text, bool invert, bool stipple,
-             bool raw=false, int mininv=0, int maxinv=32, unsigned char arrow=0);
+             bool raw=false, int mininv=0, int maxinv=32, unsigned char arrow=0,
+             unsigned char vertical_shift=0, bool use_background=false);
     std::vector<int> visible(unsigned logical_rows);
     void page(int direction) { first += direction*6; if(first<0) first=0; manual=true; }
 };
 void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows,
-                int arrows, uint8_t *frame, const unsigned char (*icons)[8]);
+                int arrows, uint8_t *frame, const unsigned char (*icons)[8],
+                const char (*background)[256] = nullptr);
