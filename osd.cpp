@@ -129,6 +129,9 @@ void StarsUpdate()
 		}
 		framebuffer_plot(stars[i].x >> 4, stars[i].y >> 4);
 	}
+	// Chinese rows may use framebuffer as their background. Recompose after
+	// each starfield update, otherwise the new background remains invisible.
+	if (OsdChinese()) zh_dirty = true;
 	osdset = -1;
 }
 
