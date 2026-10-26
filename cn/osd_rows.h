@@ -4,10 +4,13 @@
 #include <string.h>
 
 // Chinese text uses 16 physical rows (eight 16-pixel menu entries).
-// The menu FPGA interface can request 19 rows. Always clear rows 16..18
-// before uploading them, never leak stale data from a previous display.
-inline void ZhClearUnusedOsdRows(uint8_t *osdbuf, int *osdset, int physical_rows)
+// In MENU_CORE, physical rows 16..18 are the dedicated status/header bar.
+// Menu.cpp explicitly writes these rows (16 blank, 17 status text, 18 blank).
+// They MUST NOT be wiped when uploading 19 rows.
+// Other 19-row contexts may clear unused trailing lines explicitly.
+inline void ZhClearUnusedOsdRows(uint8_t *osdbuf, int *osdset, int physical_rows, bool menu_header=false)
 {
+    if(menu_header) return; // Protect dedicated top header/status rows.
     if(!osdbuf || !osdset) return;
     if(physical_rows>19) physical_rows=19;
     for(int row=16; row<physical_rows; ++row) {
