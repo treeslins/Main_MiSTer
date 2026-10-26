@@ -10,11 +10,19 @@ static unsigned char lower(unsigned char c) { return c>='A' && c<='Z' ? c+32 : c
 
 std::string ZhTranslate(const std::string &source)
 {
-    // Normalize presentation padding only; the caller's source is untouched.
+    // Keep the original OSD indentation. The legacy menu deliberately
+    // uses leading spaces to align submenus and settings with their parents.
+    // Only fold repeated spaces in the translatable part of the sentence,
+    // preserving the previous phrase-matching behavior for padded values.
+    size_t indent_end=0;
+    while(indent_end<source.size() &&
+          (source[indent_end]==' ' || source[indent_end]=='\t')) ++indent_end;
     std::string text;
-    for(unsigned char c : source) {
-        if(c==' ' || c=='\t') { if(!text.empty() && text.back()!=' ') text+=' '; }
-        else text+=c;
+    for(size_t index=indent_end; index<source.size(); ++index) {
+        unsigned char c=(unsigned char)source[index];
+        if(c==' ' || c=='\t') {
+            if(!text.empty() && text.back()!=' ') text+=' ';
+        } else text+=(char)c;
     }
     while(!text.empty() && text.back()==' ') text.pop_back();
     std::string output;
@@ -32,6 +40,9 @@ std::string ZhTranslate(const std::string &source)
         if(match) { output+=match->chinese; i+=strlen(match->english); }
         else output+=text[i++];
     }
+    // Restore the leading-space columns after translation, so translated
+    // options retain the original menu's horizontal hierarchy.
+    output.insert(0, indent_end, ' ');
     return ZhMixedText(output);
 }
 
@@ -122,26 +133,41 @@ void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
 
 std::vector<int> ZhPage::visible(unsigned logical_rows)
 {
-    std::vector<int> active;
+    const unsigned limit=std::min(logical_rows,32u);
     int footer=-1;
-    for(unsigned i=0; i<std::min(logical_rows,32u); ++i) {
-        const std::string &text=rows[i].text;
-        if(text.find_first_not_of(" \t\r\n")==std::string::npos) continue;
-        if(i==logical_rows-1 && !rows[i].raw &&
-           (text==u8"退出" || text==u8"返回" || text==u8"空格退出" || text==u8"Ctrl+Esc 退出")) footer=(int)i;
-        else active.push_back((int)i);
+    // Recognize the conventional exit row while preserving all other row
+    // indices. An empty row is part of the original menu layout, not a
+    // disposable element.
+    if(limit) {
+        const unsigned i=limit-1;
+        const std::string &t=rows[i].text;
+        if(!rows[i].raw &&
+           (t==u8"退出" || t==u8"返回" || t==u8"空格退出" ||
+            t==u8"Ctrl+Esc 退出"))
+            footer=(int)i;
     }
-    const int slots=footer>=0?7:8;
-    auto selected=std::find(active.begin(),active.end(),focus);
-    if(!manual && selected!=active.end()) {
-        int at=(int)(selected-active.begin());
-        if(at<first) first=at;
-        if(at>=first+slots) first=at-slots+1;
+    const int body_end=(footer>=0)?footer:(int)limit;
+    const int slots=(footer>=0)?7:8;
+    // Do not expose trailing unwritten rows, but preserve blank separators
+    // within the actual menu. This also keeps non-contiguous native row IDs.
+    int last_used=0;
+    for(int i=0;i<body_end;++i)
+        if(!rows[i].source.empty() || !rows[i].text.empty() || rows[i].invert)
+            last_used=i+1;
+    const int end=last_used;
+    const int max_first=std::max(0,end-slots);
+    if(!manual && focus>=0 && focus<end) {
+        if(focus<first) first=focus;
+        if(focus>=first+slots) first=focus-slots+1;
     }
-    first=std::max(0,std::min(first,std::max(0,(int)active.size()-slots)));
+    first=std::max(0,std::min(first,max_first));
     std::vector<int> result;
-    for(int i=first;i<(int)active.size() && (int)result.size()<slots;++i) result.push_back(active[i]);
-    if(footer>=0) { while(result.size()<7) result.push_back(-1); result.push_back(footer); }
+    for(int i=first;i<end && (int)result.size()<slots;++i)
+        result.push_back(i);
+    if(footer>=0) {
+        while(result.size()<7) result.push_back(-1);
+        result.push_back(footer);
+    }
     return result;
 }
 
@@ -194,13 +220,25 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			frame[(physical*2+1)*256+6+x]=(uint8_t)(bits>>8)^255;
 		}
 	}
-	// Page markers occupy the sidebar, not any translated text or selection.
-	unsigned total=0;
-	for(unsigned i=0;i<(unsigned)logical_rows && i<32;++i) if(page.rows[i].text.find_first_not_of(" \t\r\n")!=std::string::npos) ++total;
-	if(total>8) {
+	// Page markers refer to logical row positions, including deliberate
+	// blank separators, rather than counting only nonempty labels.
+	unsigned logical_end=0;
+	unsigned upper=std::min(logical_rows,32u);
+	for(unsigned i=0;i<upper;++i)
+		if(!page.rows[i].source.empty() || !page.rows[i].text.empty() || page.rows[i].invert)
+			logical_end=i+1;
+	int body_slots=(!visible.empty() && visible.back()==(int)upper-1 &&
+	                  upper && !page.rows[upper-1].raw &&
+	                  (page.rows[upper-1].text==u8"退出" ||
+	                   page.rows[upper-1].text==u8"返回" ||
+	                   page.rows[upper-1].text==u8"空格退出" ||
+	                   page.rows[upper-1].text==u8"Ctrl+Esc 退出"))?7:8;
+	unsigned body_end=(body_slots==7 && logical_end)?logical_end-1:logical_end;
+	if(icons && (page.first>0 || page.first+body_slots<(int)body_end)) {
 		for(unsigned x=0;x<8;++x) {
-			if(page.first) frame[6+x]=icons[17][x]^255;
-			if(page.first+8<(int)total) frame[15*256+6+x]=icons[16][x]^255;
+			if(page.first>0) frame[6+x]=icons[17][x]^255;
+			if(page.first+body_slots<(int)body_end)
+				frame[15*256+6+x]=icons[16][x]^255;
 		}
 	}
 }
