@@ -1,40 +1,56 @@
-# MiSTer 简体中文界面
+# MiSTer FPGA 简体中文界面（固定 ZLabs 字库版）
 
-基于上游 f6a3caa601c22fe1c34647b48ecbff6b9c7ddc09。
+## 当前实现
 
-本分支默认显示简体中文。`MiSTer.ini` 中的 `osd_language=1` 也明确启用中文；设为 `0` 并重启可切换回原版英文界面。该配置只影响显示，不改动 FPGA 核心提供的配置值、磁盘文件名或已有按键动作。
+完整的菜单中文化来自原 `chinese-osd-prototype` 分支，包含 602 条翻译、16px 中文和 8px 西文混排、8 行可视 OSD 菜单、选中项跟随、页码和底部退出项，以及支持 UTF-8 的文件名滚动显示。中文翻译显示层不更改游戏核心的配置值。
 
-中文使用 16 像素高字形。OSD 最多 128 像素高，因此屏幕一次显示最多 8 个中文条目；选中项会自动留在可见范围内，退出／返回项固定在底部。按住 Ctrl 再按 PageUp／PageDown 可以阅读当前页其余文字。文件选择器保留完整 UTF-8 文件名，并按字符滚动。主菜单、设置、帮助、提示、机型专用菜单以及常见核心选项使用 `localization/zh_CN.tsv` 的中文词条。
+本版本已经不使用旧 GNU Unifont 字库，也不会自动生成新字体。只读取固定的 ZLabs RoundPix 字库：
 
-字库包含 GNU Unifont 18.0.01 的 7,542 个字形，覆盖全部现有翻译及 GB2312 汉字。外部核心仍可提供本分支词表中未收录的新文字；这些文字会保留英文，字库没有的字符显示方框。用户生成的文件名可能含有 GB2312 以外的汉字，届时仍需扩充字库。词条通过 `localization/generate_catalog.py` 构建，字形通过 `localization/generate_font.py` 构建；二者都可离线检查。
+- GitHub 存放：`cn/assets/misterfpga.cn`
+- 实机存放：`/media/fat/misterfpga.cn`（SD 卡根目录）
+- 规格：M16CN001，7,859 个字符，314,376 字节
+- SHA-256：`cb8afcf32aabfc566ee0e39cd282c5d5a2c20049f2252dd26258696481c1a517`
+- 字型许可：SIL OFL 1.1（`cn/assets/LICENSE-OFL`）
 
-## 验证及构建
+加载器 `zh_font.cpp` 自动验证头、数据长度、Unicode 递增索引与字形宽度，并将列式位图从 MSB-first 转换为 MiSTer OSD 的 LSB-first。若字体缺失或无效，`OsdChinese()` 退回英文显示，以免出现满屏方框。
 
-主机测试：运行 `python3 tests/embed_font.py /tmp/zh-font.cpp`，再执行 `g++ -std=c++14 -I. tests/zh_render_test.cpp zh_ui.cpp zh_font.cpp /tmp/zh-font.cpp -o /tmp/zh-test` 及 `/tmp/zh-test preview.pgm`。预览图来自实际菜单布局代码。测试覆盖词条匹配、文件名原样显示、UTF-8、截断、滚动、反色、缺字、可见选中项和边界。
+## 中英文切换
 
-GitHub Actions 配置位于 `.github/workflows/zh-build.yml`，包含字体与词条的可复现检查、同步场景测试、Linux sanitizer 测试及 ARM 交叉编译。标准构建命令为 `source setup_default_toolchain.sh`，随后 `make`。
+在 `MiSTer.ini` 中设置：
 
-2026-09-23 验证：使用与上游同版本的 GNU Arm 10.2-2020.11 工具链，完整编译链接 125 个源码／资源，生成 ARM ELF32 hard-float 主程序。主机像素与翻译测试、Git 合并和上游新增文字报告测试通过。GitHub 的 Linux 构建、sanitizer 测试与产物上传也已通过；真机显示仍需验证。
+~~~ini
+[MiSTer]
+osd_language=1
+~~~
 
-真机测试前保留 SD 卡根目录原来的 `MiSTer` 文件。测试版主程序替换该文件；如果显示或启动异常，从电脑恢复备份即可。未经真机验证，不应作为日常稳定版分发。
+`1` 启用中文，`0` 使用英文。当前开发分支的缺省值为 1。修改配置后重启。
 
-## 上游自动同步
+## 自动跟随官方上游
 
-`.github/workflows/sync-upstream.yml` 每日 UTC 03:23 检查上游，也支持手动运行。默认分支必须是包含中文修改的开发分支。每次发现上游更新时，工作流会把新增的 C/C++ 字符串常量列入候选 PR 和报告附件，供维护者检查是否需要补充中文词条。
+`.github/workflows/mister-cn-integrated.yml` 每天 03:27 UTC 定时运行，亦可从 GitHub Actions 手动触发。它会检出当前中文工程，获取 `MiSTer-devel/Main_MiSTer/master` 并在 CI 临时工作区进行 Git 合并，再依次执行：
 
-- 没有新提交：结束，不创建分支或 PR。
-- 正常合并：创建包含上游与中文修改的候选分支，发起草稿 PR；相同上游与基础版本不重复创建 PR。
-- 发生冲突：中止候选合并，保存文件列表和诊断，任务失败供维护者处理；不修改默认分支。
-- 成功生成候选后，同一个同步工作流直接调用构建工作流，并检出候选提交。它不依赖机器人 PR 自动触发另一条工作流。
+1. SHA-256 校验固定字体，**原样复制**至构建包，不下载也不重新生成；
+2. 验证 602 条中文翻译词条的一致性；
+3. 编译并运行主机端中文菜单渲染、UTF-8、滚动、选中项和位图位序测试；
+4. 用官方 ARM GCC 10.2 交叉编译 MiSTer；
+5. 只在全部通过后上传构建产物，定时或手动构建才建立 GitHub 预发布版。
 
-候选构建只授予读取权限。不会自动合并、正式发布或更新设备。新增的上游菜单文字需要对照词表人工翻译；未知文本会以英文显示。
+如果上游合并冲突、字体缺失或者任何测试失败，整个任务失败，不会覆盖已有的成功产物；也不会向默认分支自动写回合并结果或自动更新实体设备。
 
-PR 合入 Fork 的默认分支并在 Settings → Actions → General 允许 Actions 创建 Pull Request 后，可手动运行 Prepare upstream update。公开仓库长期无活动时，GitHub 可能停用定时任务，需要重新启用。
+## 本地和真机验证
 
-## 下一阶段
+主机测试（在仓库根目录，需提供固定字体路径）：
 
-1. 真机确认菜单、高低分辨率核心、视频旋转及文件选择器的显示效果。
-2. 校对真实核心提供的动态菜单文字，并补充词表中的遗漏。
-3. 在 Fork 上实际运行一次上游同步，检查冲突和候选构建。不要将未经验证的版本自动推送到设备。
+~~~bash
+export MISTER_CN_FONT_PATH=cn/assets/misterfpga.cn
+g++ -std=gnu++14 -I. tests/zh_render_test.cpp zh_ui.cpp zh_font.cpp -o /tmp/zh-test
+/tmp/zh-test /tmp/zh-preview.pgm
+g++ -std=gnu++14 -I. tests/zlabs_loader_test.cpp zh_font.cpp -o /tmp/font-test
+/tmp/font-test
+~~~
 
-Fork 建议保留纯上游镜像分支与中文开发分支。自动同步只更新候选分支；无冲突不等于显示效果正确。发布时记录上游提交、中文补丁版本及对应源码，附带原项目和字体许可。
+ARM 交叉编译使用 `make`，需要 ARM GNU 10.2 工具链。构建结果能通过编译，并不等于已经完成 CRT/HDMI 真机验收。真实 MiSTer 测试前务必备份 SD 卡根目录的 `MiSTer`，把新编译的 `MiSTer` 和 `misterfpga.cn` 都放在根目录。如果出现启动、显示或菜单异常，立即恢复原版主程序。
+
+中文菜单在 CRT 低分辨率、特殊核心 OSD、旋转以及不同视频模式下仍需确认。若 `menu.rbf` 的行为与旧版预期不同，还需要独立兼容性修正。
+
+更多集成细节见 `cn/README.md`。
