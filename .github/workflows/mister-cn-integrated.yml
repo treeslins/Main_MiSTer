@@ -67,6 +67,8 @@ jobs:
             tests/zh_render_test.cpp zh_ui.cpp zh_font.cpp \
             -o /tmp/mister-cn-test
           /tmp/mister-cn-test dist/preview.pgm
+          g++ -std=gnu++14 -Wall -Wextra -I. tests/zlabs_loader_test.cpp zh_font.cpp -o /tmp/zlabs-loader-test
+          /tmp/zlabs-loader-test
 
       - name: Restore cached ARM 10.2 toolchain
         id: compiler
