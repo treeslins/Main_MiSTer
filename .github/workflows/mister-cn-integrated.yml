@@ -100,11 +100,14 @@ jobs:
         run: |
           cp cn/assets/LICENSE-OFL dist/LICENSE-OFL
           cp LICENSE dist/LICENSE-MISTER
+          # Capture the exact staged upstream merge against the checked-out Chinese revision.
+          git diff --cached --binary > dist/upstream-merge.patch
           {
             echo "UPSTREAM_SHA=$UPSTREAM_SHA"
             echo "CHINESE_SHA=$GITHUB_SHA"
             echo "FONT_SHA256=$(sha256sum cn/assets/misterfpga.cn | cut -d' ' -f1)"
             echo "FONT_REGENERATED=NO"
+            echo "UPSTREAM_MERGE_PATCH_SHA256=$(sha256sum dist/upstream-merge.patch | cut -d' ' -f1)"
             ( cd dist && sha256sum MiSTer misterfpga.cn coverage.json )
           } > dist/manifest.txt
 
@@ -144,12 +147,14 @@ jobs:
           Upstream: $up
           Chinese source: $cn
           Fixed font SHA-256: $(sha256sum dist/misterfpga.cn | cut -d' ' -f1)
+          Source tag references Chinese base $cn; apply upstream-merge.patch
+          to that commit to recover source used by the automated build.
           Install both MiSTer and misterfpga.cn at the MiSTer SD-card root.
           osd_language=0 in MiSTer.ini switches to original English behavior.
           Before any test back up the working MiSTer executable.
           EOF
           gh release create "$tag" dist/MiSTer dist/misterfpga.cn \
             dist/LICENSE-OFL dist/LICENSE-MISTER dist/coverage.json \
-            dist/manifest.txt dist/preview.pgm \
-            --target master --prerelease --title "Chinese ZLabs preview ${up:0:10}" \
+            dist/manifest.txt dist/preview.pgm dist/upstream-merge.patch \
+            --target "$cn" --prerelease --title "Chinese ZLabs preview ${up:0:10}" \
             --notes-file release-notes.md
