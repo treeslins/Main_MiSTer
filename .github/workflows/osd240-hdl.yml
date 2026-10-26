@@ -72,6 +72,12 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/MiSTer-devel/Menu_MiSTer.git /tmp/cn-menu-upstream
           bash experiment/osd256/test_upstream_integration.sh /tmp/cn-menu-upstream
+      - name: Test asynchronous framebuffer clocks
+        run: |
+          iverilog -g2012 -Wall -s tb_dualclock -o /tmp/cn-osd240/dualclock.vvp \
+            experiment/osd256/cn_osd240_dualclock_ram.v \
+            experiment/osd256/tb_cn_osd240_dualclock.v
+          vvp /tmp/cn-osd240/dualclock.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
