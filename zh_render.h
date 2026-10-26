@@ -32,7 +32,8 @@ inline uint32_t ZhDecode(const char *&s)
 // scroll_pixels is a viewport offset, never a byte offset into UTF-8.
 inline unsigned ZhRender(const char *text, uint8_t *top, uint8_t *bottom,
                          unsigned width, bool invert=false, bool stipple=false,
-                         unsigned scroll_pixels=0, const unsigned char (*icons)[8]=nullptr)
+                         unsigned scroll_pixels=0, const unsigned char (*icons)[8]=nullptr,
+                         unsigned vertical_shift=0)
 {
     memset(top, invert?255:0, width);
     memset(bottom, invert?255:0, width);
@@ -55,6 +56,8 @@ inline unsigned ZhRender(const char *text, uint8_t *top, uint8_t *bottom,
                 bits=0;
                 for(unsigned y=0;y<8;++y) if(icons[cp-0xe000][c]&(1u<<y)) bits|=3u<<(2*y);
             }
+            // Match the legacy per-column << offset operation, before inversion.
+            if (vertical_shift) bits=(uint16_t)(bits << (vertical_shift>7?7:vertical_shift));
             if (stipple!=toggle_stipple) bits &= (x&1)?0xaaaa:0x5555;
             top[x]=(uint8_t)bits ^ ((invert!=toggle_inverse)?255:0);
             bottom[x]=(uint8_t)(bits>>8) ^ ((invert!=toggle_inverse)?255:0);
