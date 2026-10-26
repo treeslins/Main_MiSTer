@@ -52,7 +52,8 @@ int main() {
     assert(page.rows[6].source.empty());
     page.set(0,"New item",true,false);
     auto rows=page.visible(8);
-    assert(rows.size()==1 && rows[0]==0);
+    assert(rows.size()==8 && rows[0]==0 && rows[7]==7); // Native blank slots stay in place.
+    assert(page.rows[6].source.empty() && page.rows[0].source=="New item");
 
     // Ensure a 32-row logical page never draws outside 16 physical OSD rows.
     struct Guarded {
