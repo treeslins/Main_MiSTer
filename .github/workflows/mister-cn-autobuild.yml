@@ -1,0 +1,158 @@
+name: MiSTer CN - upstream auto patch and build
+
+on:
+  schedule:
+    - cron: '27 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: mister-cn-autobuild
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Patch and cross-compile upstream
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout this fork (overlay source)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Checkout upstream Main_MiSTer
+        uses: actions/checkout@v4
+        with:
+          repository: MiSTer-devel/Main_MiSTer
+          ref: master
+          path: upstream
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Checkout ZLabs RoundPix font sources
+        uses: actions/checkout@v4
+        with:
+          repository: Astro-2539/ZLabs-RoundPix-16px
+          ref: main
+          path: font-src
+          persist-credentials: false
+
+      - name: Generate Unicode font from upstream KBITX
+        run: |
+          python3 cn/build_font.py font-src/src/ZLabsRoundPix_16px_CN.kbitx \
+            --output dist/misterfpga.cn --report dist/coverage.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open('dist/coverage.json', encoding='utf-8'))
+          assert d['gb2312_hanzi_count'] >= 6763, d
+          assert d['ascii_printable_count'] == 95, d
+          assert d['cropped_pixels'] == 0, d
+          assert d['glyph_count'] >= 7800, d
+          PY
+
+      - name: Apply guarded Chinese overlay to latest upstream
+        run: |
+          python3 cn/apply_overlay.py upstream
+          g++ -std=gnu++14 -Wall -Wextra -Werror -c cn/cn_font.cpp -o /tmp/cn_font_host.o
+          git -C upstream add -N osd.cpp cn_font.cpp cn_font.h
+          git -C upstream diff --binary > dist/overlay.diff
+          test -s dist/overlay.diff
+
+      - name: Cache ARM 10.2 toolchain
+        id: cache-compiler
+        uses: actions/cache@v4
+        with:
+          path: .toolchain
+          key: arm-none-linux-gnueabihf-gcc-10.2-2020.11-v1
+
+      - name: Install ARM cross toolchain
+        if: steps.cache-compiler.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .toolchain
+          curl -fL --retry 3 --retry-delay 5 \
+            'https://developer.arm.com/-/media/Files/downloads/gnu-a/10.2-2020.11/binrel/gcc-arm-10.2-2020.11-x86_64-arm-none-linux-gnueabihf.tar.xz' \
+            -o /tmp/arm-toolchain.tar.xz
+          tar -xJf /tmp/arm-toolchain.tar.xz -C .toolchain --strip-components=1
+
+      - name: Cross-compile ARM MiSTer
+        run: |
+          echo "$GITHUB_WORKSPACE/.toolchain/bin" >> "$GITHUB_PATH"
+          export PATH="$GITHUB_WORKSPACE/.toolchain/bin:$PATH"
+          arm-none-linux-gnueabihf-gcc --version | head -1
+          make -C upstream
+          test -s upstream/bin/MiSTer
+          arm-none-linux-gnueabihf-readelf -h upstream/bin/MiSTer | grep -q 'Machine:.*ARM'
+          cp upstream/bin/MiSTer dist/MiSTer
+
+      - name: Prepare provenance and required font license
+        run: |
+          cp font-src/LICENSE-OFL dist/LICENSE-OFL
+          {
+            echo "UPSTREAM_REPOSITORY=MiSTer-devel/Main_MiSTer"
+            echo "UPSTREAM_SHA=$(git -C upstream rev-parse HEAD)"
+            echo "FONT_REPOSITORY=Astro-2539/ZLabs-RoundPix-16px"
+            echo "FONT_SHA=$(git -C font-src rev-parse HEAD)"
+            echo "OVERLAY_SHA=$(sha256sum dist/overlay.diff | cut -d' ' -f1)"
+            echo "OUTPUTS_SHA256:"
+            ( cd dist && sha256sum MiSTer misterfpga.cn overlay.diff coverage.json )
+          } > dist/manifest.txt
+
+      - name: Upload verified outputs, never on build failure
+        uses: actions/upload-artifact@v4
+        with:
+          name: mister-cn-verified
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish distinct pre-release (only after green build)
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download successful build output
+        uses: actions/download-artifact@v4
+        with:
+          name: mister-cn-verified
+          path: dist
+
+      - name: Publish versioned GitHub pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_sha=$(sed -n 's/^UPSTREAM_SHA=//p' dist/manifest.txt)
+          font_sha=$(sed -n 's/^FONT_SHA=//p' dist/manifest.txt)
+          overlay_sha=$(sed -n 's/^OVERLAY_SHA=//p' dist/manifest.txt)
+          tag="cn-preview-${upstream_sha:0:10}-${font_sha:0:7}-${overlay_sha:0:7}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Already published $tag; no duplicate release."
+            exit 0
+          fi
+          cat > notes.md <<EOF
+          Automated experimental MiSTer Chinese-font build.
+
+          - Official Main_MiSTer upstream: $upstream_sha
+          - ZLabs RoundPix 16px font source: $font_sha
+          - Chinese overlay: $overlay_sha
+          - Source licenses: GPL-3.0 (MiSTer), OFL-1.1 (font); preserve LICENSE-OFL.
+
+          IMPORTANT: The 16px OSD hook is a proof of concept, disabled by default.
+          It has not been validated on physical MiSTer hardware. Do not overwrite
+          your working MiSTer installation without a backup and a recovery method.
+          Font binary misterfpga.cn is NOT an oldmanfont.ex replacement.
+          EOF
+          gh release create "$tag" \
+            dist/MiSTer dist/misterfpga.cn dist/coverage.json \
+            dist/manifest.txt dist/LICENSE-OFL dist/overlay.diff \
+            --target master --prerelease \
+            --title "MiSTer CN preview ${upstream_sha:0:10}" \
+            --notes-file notes.md
