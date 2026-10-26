@@ -27,6 +27,13 @@ jobs:
             experiment/osd256/cn_osd240_ram.v \
             experiment/osd256/tb_cn_osd240_ram.v
           vvp /tmp/cn-osd240/test.vvp
+      - name: Compile and simulate full 240p pixel scan mapping
+        run: |
+          iverilog -g2012 -Wall -s tb_scan -o /tmp/cn-osd240/scan.vvp \
+            experiment/osd256/cn_osd240_ram.v \
+            experiment/osd256/cn_osd240_pixel.v \
+            experiment/osd256/tb_cn_osd240_pixel.v
+          vvp /tmp/cn-osd240/scan.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
