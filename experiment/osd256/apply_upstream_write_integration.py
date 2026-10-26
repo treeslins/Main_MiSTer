@@ -25,7 +25,7 @@ wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
 // Demonstrate use of the genuine pixel clock and a registered read port.
-// Display mux is NOT switched to this path until timing is validated.
+// Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
  .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .ram_data(cn240_video_read),
@@ -34,7 +34,7 @@ cn_osd240_pixel cn240_reader (
  .active(cn240_video_active)
 );
 cn_osd240_spi_adapter cn240_spi (
- .clk(clk_sys), .reset(~io_osd && !osd_enable),
+ .clk(clk_sys), .reset(1'b0),
  .io_osd(io_osd), .io_strobe(io_strobe), .io_din(io_din),
  .enabled(cn240_enabled), .ext_write(cn240_write),
  .ext_header(cn240_header), .ext_row(cn240_row),
@@ -66,4 +66,4 @@ q.write_text(q.read_text()+
  '\nset_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_spi_adapter.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_dualclock_ram.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n')
-print("Applied real scan-counter tap and dualclock RAM; legacy video output unchanged")
+print("Applied scan-counter tap and dualclock RAM with persistent SPI mode; legacy video unchanged")
