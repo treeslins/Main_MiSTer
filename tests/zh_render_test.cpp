@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     }
     struct { uint8_t pre; uint8_t data[15]; uint8_t post; } guard={42,{},43};
     ZhRender(u8"中文",guard.data,b,15); assert(guard.pre==42 && guard.post==43);
-    assert(ZhTranslate("   System Settings  ")==u8"系统设置");
+    assert(ZhTranslate("   System Settings  ")==u8"   系统设置");
     assert(ZhTranslate("Core Volume:        Off")==u8"核心音量: 关闭");
     assert(ZhTranslate("Video Mode: Auto")==u8"视频模式: 自动");
     assert(ZhTranslate("/media/fat/Save.rom")=="/media/fat/Save.rom");
@@ -48,7 +48,35 @@ int main(int argc, char **argv) {
     assert(page.rows[0].text=="Save");
     page.clear();
     page.set(0,"Help",false,false); page.set(4,"About",true,false); page.set(15,"exit",false,false);
-    auto rows=page.visible(16); assert(rows[0]==0 && rows[1]==4 && rows[7]==15);
+    auto rows=page.visible(16); assert(rows.size()==8 && rows[0]==0 && rows[1]==1 && rows[4]==4 && rows[7]==15);
+    // Preserve menu separator rows, native row indices and leading spaces.
+    ZhPage spacing;
+    spacing.set(0,"Settings",false,false);
+    spacing.set(1,"",false,false); // deliberately blank separator
+    spacing.set(2,"    Video Mode: Auto",false,false);
+    spacing.set(4,"    Core Volume:        Off",true,false);
+    spacing.set(7,"         exit",false,false);
+    auto natural=spacing.visible(8);
+    assert(natural.size()==8);
+    for(int i=0;i<7;++i) assert(natural[(unsigned)i]==i);
+    assert(natural[7]==7);
+    assert(spacing.rows[2].text==u8"    视频模式: 自动");
+    assert(spacing.rows[4].text==u8"    核心音量: 关闭");
+    // On a taller native menu, scroll using logical row numbers and do not
+    // drop blank separators or reorder options.
+    ZhPage grouped;
+    grouped.set(0,"Top",false,false);
+    grouped.set(1,"",false,false);
+    grouped.set(2,"Group A",false,false);
+    grouped.set(3,"",false,false);
+    grouped.set(4,"Group B",false,false);
+    grouped.set(12,"Selected",true,false);
+    grouped.set(15,"       exit",false,false);
+    auto paged=grouped.visible(16);
+    assert(paged.size()==8 && paged[7]==15);
+    assert(paged[0]==6 && paged[6]==12 && grouped.first==6);
+    assert(std::find(paged.begin(),paged.end(),3)==paged.end());
+
     uint8_t icons[256][8]={}; icons[0x16][0]=1;
     uint8_t menu_frame[16*256];
     ZhDrawPage(page,u8"系统设置",16,1,menu_frame,icons);
@@ -59,7 +87,7 @@ int main(int argc, char **argv) {
         for(unsigned x=22;x<160;++x)
             if(menu_frame[physical*256+x]) footer_ink=true;
     assert(footer_ink); // Pinned exit is visible in the bottom two OSD rows.
-    assert(menu_frame[2*256+40]!=0); // Focused "About" is highlighted.
+    assert(menu_frame[8*256+40]!=0); // Focused "About" stays in logical row 4.
     auto mixed=ZhMixedText("\x16");
     assert(ZhRender(mixed.c_str(),a,b,8,false,false,0,icons)==8 && a[0]==3 && b[0]==0);
     auto toggle=ZhMixedText("\x0c A");
