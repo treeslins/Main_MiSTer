@@ -78,6 +78,13 @@ jobs:
             experiment/osd256/cn_osd240_dualclock_ram.v \
             experiment/osd256/tb_cn_osd240_dualclock.v
           vvp /tmp/cn-osd240/dualclock.vvp
+      - name: Verify 240p scan timing under changing coordinates
+        run: |
+          iverilog -g2012 -Wall -s tb_scan_stream -o /tmp/cn-osd240/scan_stream.vvp \
+            experiment/osd256/cn_osd240_ram.v \
+            experiment/osd256/cn_osd240_pixel.v \
+            experiment/osd256/tb_cn_osd240_scan_stream.v
+          vvp /tmp/cn-osd240/scan_stream.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
