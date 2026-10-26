@@ -131,6 +131,18 @@ void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
     if(invert && focus!=(int)row) { focus=(int)row; manual=false; }
 }
 
+// Translation now keeps original leading indentation. Recognize the pinned
+// exit row by its label, not by its padding columns.
+static bool zh_footer_label(const ZhRow &row)
+{
+    if(row.raw) return false;
+    size_t start=row.text.find_first_not_of(" \t");
+    if(start==std::string::npos) return false;
+    const std::string label=row.text.substr(start);
+    return label==u8"退出" || label==u8"返回" ||
+           label==u8"空格退出" || label==u8"Ctrl+Esc 退出";
+}
+
 std::vector<int> ZhPage::visible(unsigned logical_rows)
 {
     const unsigned limit=std::min(logical_rows,32u);
@@ -140,11 +152,7 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     // disposable element.
     if(limit) {
         const unsigned i=limit-1;
-        const std::string &t=rows[i].text;
-        if(!rows[i].raw &&
-           (t==u8"退出" || t==u8"返回" || t==u8"空格退出" ||
-            t==u8"Ctrl+Esc 退出"))
-            footer=(int)i;
+        if(zh_footer_label(rows[i])) footer=(int)i;
     }
     const int body_end=(footer>=0)?footer:(int)limit;
     const int slots=(footer>=0)?7:8;
@@ -227,12 +235,7 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 	for(unsigned i=0;i<upper;++i)
 		if(!page.rows[i].source.empty() || !page.rows[i].text.empty() || page.rows[i].invert)
 			logical_end=i+1;
-	int body_slots=(!visible.empty() && visible.back()==(int)upper-1 &&
-	                  upper && !page.rows[upper-1].raw &&
-	                  (page.rows[upper-1].text==u8"退出" ||
-	                   page.rows[upper-1].text==u8"返回" ||
-	                   page.rows[upper-1].text==u8"空格退出" ||
-	                   page.rows[upper-1].text==u8"Ctrl+Esc 退出"))?7:8;
+	const int body_slots=(upper && zh_footer_label(page.rows[upper-1]))?7:8;
 	unsigned body_end=(body_slots==7 && logical_end)?logical_end-1:logical_end;
 	if(icons && (page.first>0 || page.first+body_slots<(int)body_end)) {
 		for(unsigned x=0;x<8;++x) {
