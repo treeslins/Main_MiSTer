@@ -779,7 +779,7 @@ void OsdUpdate()
 	int n = is_menu() ? 19 : osd_size;
 	if(OsdChinese()) {
 		n=is_menu()?19:16;
-		ZhClearUnusedOsdRows(osdbuf, &osdset, n);
+		ZhClearUnusedOsdRows(osdbuf, &osdset, n, is_menu());
 	}
 	for (int i = 0; i < n; i++)
 	{
