@@ -68,6 +68,10 @@ jobs:
           assert 'self-hosted' in workflow
           print('PASS: FPGA artifact cannot be published without integration and Quartus.')
           PY
+      - name: Elaborate modified actual upstream OSD module
+        run: |
+          git clone --depth 1 https://github.com/MiSTer-devel/Menu_MiSTer.git /tmp/cn-menu-upstream
+          bash experiment/osd256/test_upstream_integration.sh /tmp/cn-menu-upstream
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
