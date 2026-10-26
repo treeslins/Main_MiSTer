@@ -162,15 +162,16 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     for(int i=0;i<body_end;++i)
         if(!rows[i].source.empty() || !rows[i].text.empty() || rows[i].invert)
             last_used=i+1;
-    const int end=last_used;
-    const int max_first=std::max(0,end-slots);
-    if(!manual && focus>=0 && focus<end) {
+    const int max_first=std::max(0,last_used-slots);
+    if(!manual && focus>=0 && focus<last_used) {
         if(focus<first) first=focus;
         if(focus>=first+slots) first=focus-slots+1;
     }
     first=std::max(0,std::min(first,max_first));
     std::vector<int> result;
-    for(int i=first;i<end && (int)result.size()<slots;++i)
+    // Keep native 8-row geometry even when trailing displayed rows contain
+    // no text. The viewport scroll range is limited by real menu content.
+    for(int i=first;i<body_end && (int)result.size()<slots;++i)
         result.push_back(i);
     if(footer>=0) {
         while(result.size()<7) result.push_back(-1);
