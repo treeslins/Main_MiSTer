@@ -41,6 +41,7 @@ as rotated copies of the first 128 entries.  -- AMR
 #include "osd.h"
 #include "zh_render.h"
 #include "zh_ui.h"
+#include "cn/osd_rows.h"
 #include "cfg.h"
 #include "spi.h"
 
@@ -778,14 +779,7 @@ void OsdUpdate()
 	int n = is_menu() ? 19 : osd_size;
 	if(OsdChinese()) {
 		n=is_menu()?19:16;
-		// Chinese renderer owns the first 16 physical rows. On 19-row
-		// menu cores, never transmit leftovers from a previous legacy OSD.
-		for (int i = 16; i < n; ++i) {
-			uint8_t *line = osdbuf + i * 256;
-			bool stale = false;
-			for (int col = 0; col < 256; ++col) if (line[col]) { stale = true; break; }
-			if (stale) { memset(line, 0, 256); osdset |= 1 << i; }
-		}
+		ZhClearUnusedOsdRows(osdbuf, &osdset, n);
 	}
 	for (int i = 0; i < n; i++)
 	{
