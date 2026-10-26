@@ -1,0 +1,33 @@
+name: Experimental 240p Chinese OSD HDL checks
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'experiment/osd256/**'
+      - '.github/workflows/osd240-hdl.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install HDL tools
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+      - name: Verify 224p/240p display and memory budgets
+        run: python3 experiment/osd256/test_memory_map.py
+      - name: Compile and run SRAM/status-bar isolation simulation
+        run: |
+          mkdir -p /tmp/cn-osd240
+          iverilog -g2012 -Wall -s tb -o /tmp/cn-osd240/test.vvp \
+            experiment/osd256/cn_osd240_ram.v \
+            experiment/osd256/tb_cn_osd240_ram.v
+          vvp /tmp/cn-osd240/test.vvp
+      - name: Clarify output scope
+        run: |
+          echo "HDL syntax and memory-bank simulation only."
+          echo "No Quartus synthesis, no menu.rbf, no ARM/FPGA integrated protocol."
