@@ -49,3 +49,11 @@
 另一个关键问题：官方 OSD 被 `sys/sys_top.v` 分别例化为 `hdmi_osd` 与 `vga_osd`，使用共同 `io_strobe`/`io_din` 但不同片选；扩展能力和模式状态必须与两路输出分别匹配。对于 VGA/CRT 还须验证 OSD 的缩放/扫描参数和 224p 安全区。
 
 这一轮为实验桥增加了“命令有效时禁止误写入 RAM”的保护及测试；**尚未将其接入上游 OSD**。下一阶段先完成事务级指令设计及独立仿真，再进行视频顶层集成和 Quartus 综合。
+
+## 真实 OSD SPI 事务适配原型（第六轮）
+
+已增加 `cn_osd240_spi_adapter.v` 和 `tb_cn_osd240_spi_adapter.v`，仿真严格按照官方 `sys/osd.v` 的 `io_osd` 片选、`io_strobe` 上升沿、首字节指令及后续字节载荷来发包。扩展在默认情况下关闭，需要实验性 F0 + CN24 魔数字节序列；F1 关闭；F2 选择正文行，F3 选择状态栏行。仿真覆盖错误握手、不支持行号和关闭后的禁止写入。
+
+**协议仍是私有实验设计。F0–F3 尚未从官方 OSD 协议中协商保留，不能与既有硬件命令直接混接；`legacy_passthrough` 目前只是状态提示，不是对上游命令解析的完整多路选择。新模块尚未接入 `sys/osd.v`、HPS ARM、VGA/HDMI 顶层；也没有 FPGA capability discovery、CDC 或真实时钟域双口 RAM 验证。**
+
+最新成功仿真：[Actions #40319597561](https://github.com/treeslins/Main_MiSTer/actions/runs/40319597561)。
