@@ -103,7 +103,8 @@ void ZhPage::clear()
 }
 
 void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
-                 bool raw, int mininv, int maxinv, unsigned char arrow)
+                 bool raw, int mininv, int maxinv, unsigned char arrow,
+                 unsigned char vertical_shift, bool use_background)
 {
     if(row>=32) return;
     auto &r=rows[row];
@@ -114,6 +115,8 @@ void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
         r.scroll=0;
     }
     r.invert=invert; r.stipple=stipple; r.mininv=mininv; r.maxinv=maxinv; r.arrow=arrow;
+    r.vertical_shift=vertical_shift>7?7:vertical_shift;
+    r.use_background=use_background;
     if(invert && focus!=(int)row) { focus=(int)row; manual=false; }
 }
 
@@ -142,7 +145,7 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     return result;
 }
 
-void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, int arrows, uint8_t *frame, const unsigned char (*icons)[8])
+void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, int arrows, uint8_t *frame, const unsigned char (*icons)[8], const char (*background)[256])
 {
 	memset(frame,0,16*256);
 	uint8_t title_top[128],title_bottom[128];
@@ -169,12 +172,19 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			if(arrows&2) text+=u8" →";
 		}
 		if(row.scroll) text+="        "+row.text;
-		ZhRender(text.c_str(),top,bottom,234,false,row.stipple,row.scroll,icons);
+		ZhRender(text.c_str(),top,bottom,234,false,row.stipple,row.scroll,icons,row.vertical_shift);
 		for(unsigned x=0;x<234;++x) {
 			// Partial highlights are measured in old 8-pixel OSD cells.
 			bool inv=row.invert && (int)((x+22)/8)>=row.mininv && (int)((x+22)/8)<row.maxinv;
-			frame[(physical*2)*256+22+x]=top[x]^(inv?255:0);
-			frame[(physical*2+1)*256+22+x]=bottom[x]^(inv?255:0);
+			uint8_t upper=top[x]^(inv?255:0), lower=bottom[x]^(inv?255:0);
+			// Legacy framebuffer is in 8-pixel rows. Chinese OSD occupies
+			// two consecutive physical rows for every logical menu entry.
+			if(row.use_background && background) {
+				upper|=(uint8_t)background[physical*2][x];
+				lower|=(uint8_t)background[physical*2+1][x];
+			}
+			frame[(physical*2)*256+22+x]=upper;
+			frame[(physical*2+1)*256+22+x]=lower;
 		}
 		// Preserve per-row up/down navigation markers supplied by the core menu.
 		if(row.arrow) for(unsigned x=0;x<8;++x) {
