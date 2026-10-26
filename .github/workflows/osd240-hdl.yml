@@ -49,6 +49,12 @@ jobs:
             experiment/osd256/cn_osd240_pipeline.v \
             experiment/osd256/tb_cn_osd240_pipeline.v
           vvp /tmp/cn-osd240/pipeline.vvp
+      - name: Simulate real SPI transaction framing for experimental OSD
+        run: |
+          iverilog -g2012 -Wall -s tb_spi_adapter -o /tmp/cn-osd240/spi.vvp \
+            experiment/osd256/cn_osd240_spi_adapter.v \
+            experiment/osd256/tb_cn_osd240_spi_adapter.v
+          vvp /tmp/cn-osd240/spi.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
