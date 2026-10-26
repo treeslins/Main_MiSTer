@@ -19,7 +19,9 @@ module cn_osd240_bridge (
 );
  // EXPERIMENT ONLY: 0xE0,0x43,0x4E,0x32,0x34 in five successive command
  // strobes opts in. A non-handshake command cancels any partial handshake.
- // This is not yet an official MiSTer command protocol.
+ // This is not yet an official MiSTer command protocol. Real osd.v takes
+ // one command per selected SPI transaction: a multiple-command handshake
+ // MUST NOT be connected directly without a transaction-level adapter.
  reg [2:0] handshake=0;
  reg armed_row=0;
  reg header=0;
@@ -28,7 +30,7 @@ module cn_osd240_bridge (
  wire is_header = command>=8'hC0 && command<=8'hC2;
  assign extended_header=header;
  assign extended_data=data_byte;
- assign extended_write=extended_ready && armed_row && data_valid;
+ assign extended_write=extended_ready && armed_row && data_valid && !command_valid;
  assign legacy_command = command_valid && !extended_ready &&
    !(handshake!=0 || command==8'hE0);
  always @(posedge clk) begin
