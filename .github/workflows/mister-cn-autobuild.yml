@@ -36,26 +36,12 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Checkout ZLabs RoundPix font sources
-        uses: actions/checkout@v4
-        with:
-          repository: Astro-2539/ZLabs-RoundPix-16px
-          ref: main
-          path: font-src
-          persist-credentials: false
-
-      - name: Generate Unicode font from upstream KBITX
+      - name: Verify pinned misterfpga.cn (never regenerate)
         run: |
-          python3 cn/build_font.py font-src/src/ZLabsRoundPix_16px_CN.kbitx \
-            --output dist/misterfpga.cn --report dist/coverage.json
-          python3 - <<'PY'
-          import json
-          d = json.load(open('dist/coverage.json', encoding='utf-8'))
-          assert d['gb2312_hanzi_count'] >= 6763, d
-          assert d['ascii_printable_count'] == 95, d
-          assert d['cropped_pixels'] == 0, d
-          assert d['glyph_count'] >= 7800, d
-          PY
+          sha256sum -c cn/assets/SHA256SUMS
+          python3 cn/verify_font.py --input cn/assets/misterfpga.cn --report dist/coverage.json
+          cp cn/assets/misterfpga.cn dist/misterfpga.cn
+          cmp cn/assets/misterfpga.cn dist/misterfpga.cn
 
       - name: Apply guarded Chinese overlay to latest upstream
         run: |
@@ -93,12 +79,12 @@ jobs:
 
       - name: Prepare provenance and required font license
         run: |
-          cp font-src/LICENSE-OFL dist/LICENSE-OFL
+          cp cn/assets/LICENSE-OFL dist/LICENSE-OFL
           {
             echo "UPSTREAM_REPOSITORY=MiSTer-devel/Main_MiSTer"
             echo "UPSTREAM_SHA=$(git -C upstream rev-parse HEAD)"
-            echo "FONT_REPOSITORY=Astro-2539/ZLabs-RoundPix-16px"
-            echo "FONT_SHA=$(git -C font-src rev-parse HEAD)"
+            echo "FONT_TYPE=PINNED_ZLabs_RoundPix_16px"
+            echo "FONT_SHA256=$(sha256sum cn/assets/misterfpga.cn | cut -d' ' -f1)"
             echo "OVERLAY_SHA=$(sha256sum dist/overlay.diff | cut -d' ' -f1)"
             echo "OUTPUTS_SHA256:"
             ( cd dist && sha256sum MiSTer misterfpga.cn overlay.diff coverage.json )
@@ -135,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           upstream_sha=$(sed -n 's/^UPSTREAM_SHA=//p' dist/manifest.txt)
-          font_sha=$(sed -n 's/^FONT_SHA=//p' dist/manifest.txt)
+          font_sha=$(sed -n 's/^FONT_SHA256=//p' dist/manifest.txt)
           overlay_sha=$(sed -n 's/^OVERLAY_SHA=//p' dist/manifest.txt)
           tag="cn-preview-${upstream_sha:0:10}-${font_sha:0:7}-${overlay_sha:0:7}"
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -146,7 +132,7 @@ jobs:
           Automated experimental MiSTer Chinese-font build.
 
           - Official Main_MiSTer upstream: $upstream_sha
-          - ZLabs RoundPix 16px font source: $font_sha
+          - Pinned misterfpga.cn SHA-256: $font_sha (unchanged across upstream updates)
           - Chinese overlay: $overlay_sha
           - Source licenses: GPL-3.0 (MiSTer), OFL-1.1 (font); preserve LICENSE-OFL.
 
