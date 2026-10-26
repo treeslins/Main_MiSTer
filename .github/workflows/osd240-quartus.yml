@@ -1,0 +1,34 @@
+name: 240p Menu FPGA Quartus build (integration gate)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  menu-fpga:
+    # Use a runner you own with Quartus Prime Standard 17.0.x + Cyclone V
+    # device support. Hosted runners lack a preinstalled Quartus toolchain.
+    runs-on: [self-hosted, linux, x64, quartus17]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Quartus installation
+        run: |
+          command -v quartus_sh
+          command -v quartus_cpf
+          quartus_sh --version
+      - name: Fetch pinned upstream menu core
+        run: |
+          git clone --depth 1 https://github.com/MiSTer-devel/Menu_MiSTer.git upstream-menu
+          git -C upstream-menu rev-parse HEAD | tee upstream-menu.sha
+      - name: Check for real FPGA integration and compile
+        run: |
+          bash experiment/osd256/build_menu_quartus.sh "$GITHUB_WORKSPACE/upstream-menu"
+      - name: Upload experimental FPGA bitstream only after successful synthesis
+        uses: actions/upload-artifact@v4
+        with:
+          name: menu-cn-240p-experimental
+          path: dist/
+          if-no-files-found: error
