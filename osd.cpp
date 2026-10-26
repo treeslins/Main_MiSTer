@@ -271,7 +271,8 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 {
 	if(OsdChinese() && n<osd_size && n<32) {
 		if(zh_page.rows[n].source!=(s?s:"")) zh_scroll_times[n]=0;
-		zh_page.set(n,s,invert,stipple,!translate,mininv,maxinv,(unsigned char)leftchar);
+		zh_page.set(n,s,invert,stipple,!translate,mininv,maxinv,
+		            (unsigned char)leftchar, (unsigned char)((offset>=0 && offset<=7)?offset:0), usebg!=0);
 		zh_scroll_active[n]=false;
 		zh_dirty=true; zh_info=false;
 		return;
@@ -760,7 +761,7 @@ static void zh_compose()
 	}
 	if(!zh_dirty) return;
 	uint8_t frame[16*256];
-	ZhDrawPage(zh_page,zh_title,osd_size,arrow,frame,charfont);
+	ZhDrawPage(zh_page,zh_title,osd_size,arrow,frame,charfont,framebuffer);
 	for(unsigned row=0;row<16;++row) if(memcmp(frame+row*256,osdbuf+row*256,256)) {
 		memcpy(osdbuf+row*256,frame+row*256,256); osdset|=1u<<row;
 	}
