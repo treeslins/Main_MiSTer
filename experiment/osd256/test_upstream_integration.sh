@@ -5,6 +5,15 @@ cp experiment/osd256/cn_osd240_spi_adapter.v "$root/sys/"
 cp experiment/osd256/cn_osd240_dualclock_ram.v "$root/sys/"
 cp experiment/osd256/cn_osd240_pixel.v "$root/sys/"
 python3 experiment/osd256/apply_upstream_write_integration.py "$root"
+python3 - "$root/sys/osd.v" <<'PY'
+from pathlib import Path
+import sys
+src=Path(sys.argv[1]).read_text()
+assert ".clk(clk_sys), .reset(1'b0)" in src, "SPI mode wrongly tied to OSD enable"
+assert ".x(osd_hcnt[7:0]), .y(osd_vcnt[7:0])" in src
+assert "cn_osd240_dualclock_ram cn240_bank" in src
+print("PASS: persistent SPI-mode connection and actual scan counter tap")
+PY
 # Full Menu_MiSTer elaboration requires all official sys/ modules.
 # This narrower HDL probe still compiles the actual patched upstream osd.v
 # and both newly referenced modules in iverilog.
