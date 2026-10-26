@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+"""Verify the PINNED misterfpga.cn bitmap font; never regenerate it."""
+from pathlib import Path
+import argparse
+import hashlib
+import json
+import struct
+
+EXPECTED_SHA256 = "cb8afcf32aabfc566ee0e39cd282c5d5a2c20049f2252dd26258696481c1a517"
+EXPECTED_SIZE = 314376
+EXPECTED_COUNT = 7859
+
+def verify(path: Path):
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    if len(data) != EXPECTED_SIZE or digest != EXPECTED_SHA256:
+        raise ValueError(f"PINNED FONT MISMATCH: expected {EXPECTED_SHA256}, got {digest} ({len(data)} bytes)")
+    if len(data) < 16 or data[:8] != b"M16CN001":
+        raise ValueError("bad M16CN001 font header")
+    version, count = struct.unpack_from("<II", data, 8)
+    if version != 1 or count != EXPECTED_COUNT or 16 + count * 40 != len(data):
+        raise ValueError("unexpected Unicode table layout")
+    codes = set()
+    before = -1
+    for i in range(count):
+        offset = 16 + i * 40
+        cp, advance = struct.unpack_from("<IB", data, offset)
+        if cp <= before or cp > 0x10FFFF or 0xD800 <= cp <= 0xDFFF:
+            raise ValueError(f"unordered/invalid Unicode value at index {i}")
+        if advance not in (8, 16):
+            raise ValueError(f"invalid advance width for U+{cp:04X}")
+        before = cp
+        codes.add(cp)
+    ascii_count = sum(cp in codes for cp in range(32, 127))
+    gb_count = sum(
+        len((b := chr(cp).encode("gb2312", errors="ignore"))) == 2
+        and 0xB0 <= b[0] <= 0xF7
+        and 0xA1 <= b[1] <= 0xFE
+        for cp in codes
+    )
+    if ascii_count != 95 or gb_count != 6763:
+        raise ValueError(f"font coverage changed: ASCII {ascii_count}, GB2312 {gb_count}")
+    return {
+        "format": "M16CN001", "source": "pinned-static-file",
+        "sha256": digest, "file_size": len(data), "glyph_count": count,
+        "ascii_printable_count": ascii_count, "gb2312_hanzi_count": gb_count,
+    }
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=Path, default=Path("cn/assets/misterfpga.cn"))
+    parser.add_argument("--report", type=Path, default=Path("dist/coverage.json"))
+    args = parser.parse_args()
+    report = verify(args.input)
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+if __name__ == "__main__":
+    main()
