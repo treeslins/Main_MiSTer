@@ -41,3 +41,11 @@
 - `iverilog -g2012` 和 `vvp` 的硬件逻辑仿真 **通过**。
 - **尚未接入**官方 `sys/osd.v` 及 `sys/sys_top.v`，尚无 Quartus 合成结果、`menu.rbf`、FPGA 与 ARM 新协议握手。离线像素映射通过不代表真实视频同步、任意视频模式或者 CRT 扫描一定正确。
 - 接入时应修改上游 Menu_MiSTer 工程，而不能把新 Verilog 文件误当成可以单独加载的 MiSTer 核心。
+
+## 真实官方 SPI 协议接入前必须解决的差异
+
+2026-10-26 复查官方 `MiSTer-devel/Menu_MiSTer/sys/osd.v`：真实 OSD 命令在 `io_osd` 片选有效后，将第一个 `io_strobe` 识别为 8 位命令，后续选通为同一事务的载荷；而目前 `cn_osd240_bridge.v` 实验模块使用独立 `command_valid`/`data_valid` 信号，并采用五个“命令”握手。这是抽象协议，**不能直接将其接在 `io_din` 上**，否则会破坏旧版命令解析。必须设计真实 SPI 事务适配器并在 HDL 仿真中交错测试原生命令、新命令、重启和中断事务。
+
+另一个关键问题：官方 OSD 被 `sys/sys_top.v` 分别例化为 `hdmi_osd` 与 `vga_osd`，使用共同 `io_strobe`/`io_din` 但不同片选；扩展能力和模式状态必须与两路输出分别匹配。对于 VGA/CRT 还须验证 OSD 的缩放/扫描参数和 224p 安全区。
+
+这一轮为实验桥增加了“命令有效时禁止误写入 RAM”的保护及测试；**尚未将其接入上游 OSD**。下一阶段先完成事务级指令设计及独立仿真，再进行视频顶层集成和 Quartus 综合。
