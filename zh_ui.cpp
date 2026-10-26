@@ -146,33 +146,46 @@ static bool zh_footer_label(const ZhRow &row)
 std::vector<int> ZhPage::visible(unsigned logical_rows)
 {
     const unsigned limit=std::min(logical_rows,32u);
-    int footer=-1;
-    // Recognize the conventional exit row while preserving all other row
-    // indices. An empty row is part of the original menu layout, not a
-    // disposable element.
-    if(limit) {
-        const unsigned i=limit-1;
-        if(zh_footer_label(rows[i])) footer=(int)i;
-    }
+    const int footer=(limit && zh_footer_label(rows[limit-1]))?(int)limit-1:-1;
     const int body_end=(footer>=0)?footer:(int)limit;
     const int slots=(footer>=0)?7:8;
-    // Do not expose trailing unwritten rows, but preserve blank separators
-    // within the actual menu. This also keeps non-contiguous native row IDs.
     int last_used=0;
     for(int i=0;i<body_end;++i)
         if(!rows[i].source.empty() || !rows[i].text.empty() || rows[i].invert)
             last_used=i+1;
-    const int max_first=std::max(0,last_used-slots);
-    if(!manual && focus>=0 && focus<last_used) {
-        if(focus<first) first=focus;
-        if(focus>=first+slots) first=focus-slots+1;
+
+    std::vector<int> candidates;
+    // Keep native row geometry when it fits. For a 16-row legacy menu,
+    // 16px glyphs leave only seven body slots: remove separators only when
+    // required, so actual entries remain reachable by focus/page controls.
+    if(last_used<=slots) {
+        for(int i=0;i<body_end;++i) candidates.push_back(i);
+    } else {
+        for(int i=0;i<last_used;++i)
+            if(rows[i].text.find_first_not_of(" \t\r\n")!=std::string::npos ||
+               rows[i].invert || rows[i].arrow)
+                candidates.push_back(i);
+        // If fewer meaningful entries remain, keep one separator where room
+        // allows, instead of filling the viewport with discarded blanks.
+        if((int)candidates.size()<slots) {
+            candidates.clear();
+            for(int i=0;i<last_used;++i) candidates.push_back(i);
+        }
+    }
+
+    const int max_first=std::max(0,(int)candidates.size()-slots);
+    if(!manual && focus>=0 && focus!=footer) {
+        auto it=std::find(candidates.begin(),candidates.end(),focus);
+        if(it!=candidates.end()) {
+            int index=(int)(it-candidates.begin());
+            if(index<first) first=index;
+            if(index>=first+slots) first=index-slots+1;
+        }
     }
     first=std::max(0,std::min(first,max_first));
     std::vector<int> result;
-    // Keep native 8-row geometry even when trailing displayed rows contain
-    // no text. The viewport scroll range is limited by real menu content.
-    for(int i=first;i<body_end && (int)result.size()<slots;++i)
-        result.push_back(i);
+    for(int i=first;i<(int)candidates.size() && (int)result.size()<slots;++i)
+        result.push_back(candidates[i]);
     if(footer>=0) {
         while(result.size()<7) result.push_back(-1);
         result.push_back(footer);
