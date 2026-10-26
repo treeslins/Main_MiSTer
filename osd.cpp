@@ -64,7 +64,7 @@ static bool zh_info=false, zh_dirty=true;
 static unsigned long zh_scroll_times[32]={};
 static bool zh_scroll_active[32]={};
 
-bool OsdChinese() { return cfg.osd_language==1; }
+bool OsdChinese() { return cfg.osd_language==1 && ZhFontReady(); }
 void OsdChinesePage(int direction) { zh_page.page(direction); zh_dirty=true; }
 
 void OsdSetSize(int n)
