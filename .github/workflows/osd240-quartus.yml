@@ -25,7 +25,7 @@ jobs:
           git -C upstream-menu rev-parse HEAD | tee upstream-menu.sha
       - name: Apply our experimental OSD patch to upstream sources
         run: |
-          cp experiment/osd256/cn_osd240_{spi_adapter,dualclock_ram,pixel,frame_mode}.v upstream-menu/sys/
+          cp experiment/osd256/cn_osd240_{spi_adapter,dualclock_ram,pixel,frame_mode,vscan}.v upstream-menu/sys/
           python3 experiment/osd256/apply_upstream_write_integration.py upstream-menu
       - name: Check for real FPGA integration and compile
         run: |
