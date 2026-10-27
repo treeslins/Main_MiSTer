@@ -49,6 +49,17 @@ int main(int argc, char **argv) {
     for(unsigned i=2;i<=8;++i) sections.set(i,"Next",false,false);
     ZhDrawPage(sections,"",16,0,column_frame,column_icons);
     assert((column_frame[2*256+22+4]&1)!=0);
+    // A compact status page must show its three controls and exit together.
+    ZhPage status;
+    for(unsigned i=0;i<4;++i) status.set(i,"Status",false,false);
+    for(unsigned selected=4;selected<=6;++selected) {
+        for(unsigned i=4;i<=6;++i) status.set(i,"Control",i==selected,false);
+        status.set(15,"exit",false,false);
+        auto shown=status.visible(16);
+        assert(shown.size()==8);
+        for(unsigned i=0;i<7;++i) assert(shown[i]==(int)i);
+        assert(shown[7]==15);
+    }
     for(unsigned size=8;size<=18;++size) {
         ZhPage page;
         for(unsigned i=0;i<size-1;++i) page.set(i,"Menu",false,false);

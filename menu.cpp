@@ -750,6 +750,44 @@ static void printSysInfo()
 		static int flip = 0;
 
 		char str[40];
+		if (OsdChinese())
+		{
+			// The 16px Chinese viewport has seven body rows plus the exit row.
+			// Keep status in rows 0-3 and controls in rows 4-6, without the
+			// legacy 8px box drawing characters or hidden scroll pages.
+			char line[64];
+			char *net = getNet(1);
+			if (net) {
+				snprintf(line, sizeof(line), "有线 %s", net);
+				OsdWrite(0, line);
+			} else OsdWrite(0, "No network");
+			net = getNet(2);
+			if (net) {
+				snprintf(line, sizeof(line), "无线 %s", net);
+				OsdWrite(1, line);
+			} else OsdWrite(1);
+
+			flip = (flip + 1) & 3;
+			if (hasbat && (flip & 2))
+			{
+				if (bat.capacity >= 0) snprintf(line, sizeof(line), "电量：%d%%", bat.capacity);
+				else snprintf(line, sizeof(line), "电量：n/a");
+				OsdWrite(2, line);
+				if (bat.load_current > 0) snprintf(line, sizeof(line), "充电：%dmA", bat.load_current);
+				else if (bat.load_current < -1) snprintf(line, sizeof(line), "放电：%dmA", -bat.load_current);
+				else snprintf(line, sizeof(line), "Not charging");
+				OsdWrite(3, line);
+			}
+			else
+			{
+				video_mode_adjust(true);
+				video_core_description(str, sizeof(str));
+				OsdWrite(2, str);
+				video_scaler_description(str, sizeof(str));
+				OsdWrite(3, str);
+			}
+			return;
+		}
 		OsdWrite(n++, info_top, 0, 0);
 
 		int j = 0;
@@ -4045,7 +4083,7 @@ void HandleUI(void)
 		}
 		parentstate = MENU_MISC1;
 
-		OsdWrite(1, "         Information");
+		if (!OsdChinese()) OsdWrite(1, "         Information");
 
 		if (menusub != 0) flag = (flag & 0xF) | (altcfg() << 4);
 		strcpy(s, " Config:");
@@ -4063,7 +4101,7 @@ void HandleUI(void)
 		}
 		strcat(s, " ");
 		if (m) strcat(s, "\xc");
-		OsdWrite(10, s, menusub == 0);
+		OsdWrite(OsdChinese() ? 4 : 10, s, menusub == 0);
 
 		m = get_core_volume();
 		{
@@ -4076,7 +4114,7 @@ void HandleUI(void)
 			if (m & 0x60) bar[8] = '+';
 			if (m & 0x40) bar[9] = '+';
 		}
-		OsdWrite(12, s, menusub == 1);
+		OsdWrite(OsdChinese() ? 5 : 12, s, menusub == 1);
 
 		old_volume = get_volume();
 		strcpy(s, "   Global Volume: ");
@@ -4092,7 +4130,7 @@ void HandleUI(void)
 			memset(bar, 0x8C, 8 - vol);
 			memset(bar, 0x7f, 8 - vol - old_volume);
 		}
-		OsdWrite(13, s, menusub == 2);
+		OsdWrite(OsdChinese() ? 6 : 13, s, menusub == 2);
 
 		OsdWrite(15, STD_EXIT, menusub == 3, 0, OSD_ARROW_RIGHT);
 		break;
