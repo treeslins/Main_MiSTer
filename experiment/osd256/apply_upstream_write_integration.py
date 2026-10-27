@@ -38,7 +38,7 @@ wire cn240_preview_pixel = cn240_enabled_video &&
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
- .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .ram_data(cn240_video_read),
+ .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .mode_224p(1'b0), .ram_data(cn240_video_read),
  .ram_header(cn240_video_header), .ram_row(cn240_video_row),
  .ram_column(cn240_video_col), .pixel(cn240_video_pixel),
  .active(cn240_video_active)
