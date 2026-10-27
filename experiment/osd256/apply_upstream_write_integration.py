@@ -24,6 +24,14 @@ wire cn240_video_header;
 wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
+reg cn240_line_step=0, cn240_frame_start=0;
+wire [7:0] cn240_scan_y;
+wire cn240_scan_running;
+cn_osd240_vscan cn240_vscan (
+ .clk_video(clk_video), .reset(1'b0),
+ .frame_start(cn240_frame_start), .line_step(cn240_line_step),
+ .y(cn240_scan_y), .running(cn240_scan_running)
+);
 // Explicit experimental video-height request, clocked by the SPI domain.
 // It is not automatic video-mode detection. Default 240p on power-up.
 wire cn240_mode_224p_sys;
@@ -46,7 +54,7 @@ wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
- .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
+ .x(osd_hcnt[7:0]), .y(cn240_scan_y), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
  .ram_header(cn240_video_header), .ram_row(cn240_video_row),
  .ram_column(cn240_video_col), .pixel(cn240_video_pixel),
  .active(cn240_video_active)
@@ -79,6 +87,13 @@ if text.count(marker)!=1 or text.count(marker2)!=1:
 text=text.replace(marker,"",1).replace(marker2,"",1)
 scope="reg        osd_enable;"
 text=text.replace(scope,"reg [21:0] osd_vcnt;\nreg [21:0] osd_hcnt;\n"+scope,1)
+# Tap official vertical scan divider at its native rising-DE update.
+# These are pulses in clk_video, registered in the original clocked block.
+edge_anchor="\t\tif(de_in && !deD) begin"
+assert text.count(edge_anchor)==1, "upstream DE edge structure changed"
+text=text.replace(edge_anchor,"\t\tcn240_line_step <= 0;\n\t\tcn240_frame_start <= 0;\n"+edge_anchor,1)
+text=text.replace(edge_anchor,"\t\tif(de_in && !deD) begin\n\t\t\tcn240_line_step <= (osd_div == multiscan);\n\t\t\tcn240_frame_start <= (v_osd_start == v_cnt);",1)
+
 # Compile-time gated first video-mux integration. It stays OFF in the
 # ordinary upstream build; this only checks syntax of the opt-in branch.
 # The actual 224p/240p CRT-safe coordinate and CDC design is still pending.
@@ -103,7 +118,7 @@ text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
 mux_gate="\tosd_mux <= ~osd_de[2];"
 assert text.count(mux_gate)==1, "legacy OSD active mux changed"
 text=text.replace(mux_gate, """\t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tosd_mux <= ~(cn240_enabled_video ? cn240_video_active : osd_de[2]);
+\tosd_mux <= ~(cn240_enabled_video ? (cn240_scan_running && cn240_video_active) : osd_de[2]);
 \t`else
 """+mux_gate+"\n\t`endif",1)
 # Add the mode command as a separate selected SPI transaction (F4,
@@ -116,5 +131,6 @@ q.write_text(q.read_text()+
  '\nset_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_spi_adapter.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_dualclock_ram.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n'+
- 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_frame_mode.v ]\n')
+ 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_frame_mode.v ]\n'+
+ 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_vscan.v ]\n')
 print("Applied scan-counter tap and dualclock RAM with persistent SPI mode; legacy video unchanged")
