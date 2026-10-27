@@ -41,8 +41,7 @@ always @(posedge clk_video) begin
  cn240_enabled_meta <= cn240_enabled;
  cn240_enabled_video <= cn240_enabled_meta;
 end
-wire cn240_preview_pixel = cn240_enabled_video &&
-                            cn240_video_active && cn240_video_pixel;
+wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
 // Demonstrate use of the genuine pixel clock and a registered read port.
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
@@ -89,14 +88,24 @@ text=text.replace(mux_anchor, """\t// The existing legacy output remains the def
 \t// ENABLE ONLY for waveform-level investigation; this does not yet
 \t// implement safe scan scaling or a synchronized mode transition.
 \t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tordout1 <= {{cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[2], din[23:19]},
-\t            {cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[1], din[15:11]},
-\t            {cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[0], din[7:3]}};
+\tordout1 <= {{cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[2], din[23:19]},
+\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[1], din[15:11]},
+\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[0], din[7:3]}};
 \t`else
 """+mux_anchor,1)
 end_anchor="\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"
 assert text.count(end_anchor)==1
 text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
+# The original osd_mux is only valid for the legacy 128px raster. In the
+# explicitly unsafe preview, use the extended active flag instead, while
+# falling back to the original enabled area when the extension is off.
+# This is NOT sufficient for production timing/geometry verification.
+mux_gate="\tosd_mux <= ~osd_de[2];"
+assert text.count(mux_gate)==1, "legacy OSD active mux changed"
+text=text.replace(mux_gate, """\t`ifdef CN_OSD240_PREVIEW_UNSAFE
+\tosd_mux <= ~(cn240_enabled_video ? cn240_video_active : osd_de[2]);
+\t`else
+"""+mux_gate+"\n\t`endif",1)
 # Add the mode command as a separate selected SPI transaction (F4,
 # one payload byte: 0 = 240p, 1 = 224p). The adapter exports its mode
 # register; this wire assignment connects it to the two-stage synchronizer.
