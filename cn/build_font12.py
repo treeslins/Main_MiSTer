@@ -33,7 +33,13 @@ def main():
         if width not in (6, 12):
             raise ValueError(f"Unexpected advance {width} for U+{cp:04X}")
         bitmap = Image.new("L", (16, 16))
-        ImageDraw.Draw(bitmap).text((0, 2), chr(cp), font=face, fill=255, anchor="lt")
+        # Preserve centered wide glyphs; narrow Latin glyphs share a baseline
+        # at row 13 so capitals, lowercase and punctuation sit against the
+        # Chinese bottom instead of all starting at row 2.
+        if width == 12:
+            ImageDraw.Draw(bitmap).text((0, 2), chr(cp), font=face, fill=255, anchor="lt")
+        else:
+            ImageDraw.Draw(bitmap).text((0, 13), chr(cp), font=face, fill=255, anchor="ls")
         columns = []
         for x in range(16):
             bits = sum(1 << (15 - y) for y in range(16) if bitmap.getpixel((x, y)) >= 128)
@@ -42,7 +48,7 @@ def main():
             bits = sum(1 << (15 - y) for y in range(16) if bitmap.getpixel((x, y)) >= 128)
             columns.append(bits & 255)
         records.append(struct.pack("<IB3x", cp, width) + bytes(columns))
-    output = b"M16CN002" + struct.pack("<II", 1, len(records)) + b"".join(records)
+    output = b"M16CN003" + struct.pack("<II", 1, len(records)) + b"".join(records)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(output)
     print(f"{len(records)} glyphs, {len(output)} bytes, sha256 {hashlib.sha256(output).hexdigest()}")

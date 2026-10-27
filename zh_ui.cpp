@@ -211,18 +211,41 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
 void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, int arrows, uint8_t *frame, const unsigned char (*icons)[8], const char (*background)[256])
 {
 	memset(frame,0,16*256);
-	uint8_t title_top[128],title_bottom[128];
-	ZhRender(title.c_str(),title_top,title_bottom,128,false,false,0,icons);
-	unsigned title_width=std::min(128u,ZhTextWidth(title));
-	unsigned title_start=(128-title_width)/2;
-	// Upright sidebar band with the same 22-pixel footprint as the old OSD.
-	for(unsigned y=0;y<128;++y) for(unsigned x=0;x<20;++x) {
-		bool ink=false;
-		if(x>=2 && x<18 && y>=title_start && y<title_start+title_width) {
-			unsigned col=y-title_start, bit=17-x;
-			ink=((bit<8?title_top[col]:title_bottom[col])>>(bit%8))&1;
+	const bool stacked_title=title==u8"其他选项" || title==u8"核心列表" || title==u8"系统设置";
+	if(stacked_title) {
+		// These four-character Chinese titles read top to bottom without
+		// rotating the individual glyphs. Keep the 20px sidebar footprint.
+		for(unsigned y=0;y<128;++y) for(unsigned x=0;x<20;++x)
+			frame[(y/8)*256+x]|=1u<<(y%8);
+		const char *p=title.c_str();
+		for(unsigned row=0;row<4;++row) {
+			const char *start=p;
+			ZhDecode(p);
+			std::string glyph(start,p);
+			uint8_t top[16],bottom[16];
+			const unsigned width=ZhRender(glyph.c_str(),top,bottom,16,false,false,0,icons);
+			const unsigned left=(20-width)/2;
+			for(unsigned x=0;x<width;++x) {
+				const uint16_t bits=(uint16_t)top[x] | ((uint16_t)bottom[x]<<8);
+				for(unsigned y=0;y<16;++y) if(bits&(1u<<y)) {
+					const unsigned pixel_y=32+row*16+y;
+					frame[(pixel_y/8)*256+left+x]&=~(1u<<(pixel_y%8));
+				}
+			}
 		}
-		if(!ink) frame[(y/8)*256+x]|=1u<<(y%8);
+	} else {
+		uint8_t title_top[128],title_bottom[128];
+		ZhRender(title.c_str(),title_top,title_bottom,128,false,false,0,icons);
+		unsigned title_width=std::min(128u,ZhTextWidth(title));
+		unsigned title_start=(128-title_width)/2;
+		for(unsigned y=0;y<128;++y) for(unsigned x=0;x<20;++x) {
+			bool ink=false;
+			if(x>=2 && x<18 && y>=title_start && y<title_start+title_width) {
+				unsigned col=y-title_start, bit=17-x;
+				ink=((bit<8?title_top[col]:title_bottom[col])>>(bit%8))&1;
+			}
+			if(!ink) frame[(y/8)*256+x]|=1u<<(y%8);
+		}
 	}
 	auto visible=page.visible(logical_rows);
 	for(unsigned physical=0;physical<visible.size();++physical) {

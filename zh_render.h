@@ -53,8 +53,16 @@ inline unsigned ZhRender(const char *text, uint8_t *top, uint8_t *bottom,
         for (unsigned c=start; c<w; ++c) {
             uint16_t bits=glyph?glyph->columns[c]:((c==0 || c==15)?0xffff:0x8001);
             if(icon && icons) {
-                bits=0;
-                for(unsigned y=0;y<8;++y) if(icons[cp-0xe000][c]&(1u<<y)) bits|=3u<<(2*y);
+                if(cp==0xe01c || cp==0xe01d) {
+                    // Network symbols retain their native 8px height and sit
+                    // in the middle of the 16px Chinese status row.
+                    bits=(uint16_t)icons[cp-0xe000][c]<<4;
+                } else {
+                    bits=0;
+                    for(unsigned y=0;y<8;++y) if(icons[cp-0xe000][c]&(1u<<y)) bits|=3u<<(2*y);
+                    // The inline submenu arrow otherwise sits one pixel low.
+                    if(cp==0xe016) bits>>=1;
+                }
             }
             // Match the legacy per-column << offset operation, before inversion.
             if (vertical_shift) bits=(uint16_t)(bits << (vertical_shift>7?7:vertical_shift));

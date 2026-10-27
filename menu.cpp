@@ -756,16 +756,18 @@ static void printSysInfo()
 			// Keep status in rows 0-3 and controls in rows 4-6, without the
 			// legacy 8px box drawing characters or hidden scroll pages.
 			char line[64];
-			char *net = getNet(1);
-			if (net) {
-				snprintf(line, sizeof(line), "有线 %s", net);
+			char *ethernet = getNet(1);
+			if (ethernet) {
+				snprintf(line, sizeof(line), "\x1c %s", ethernet);
 				OsdWrite(0, line);
-			} else OsdWrite(0, "No network");
-			net = getNet(2);
-			if (net) {
-				snprintf(line, sizeof(line), "无线 %s", net);
-				OsdWrite(1, line);
-			} else OsdWrite(1);
+			}
+			char *wifi = getNet(2);
+			if (wifi) {
+				snprintf(line, sizeof(line), "\x1d %s", wifi);
+				OsdWrite(ethernet ? 1 : 0, line);
+			}
+			if (!ethernet && !wifi) OsdWrite(0, "No network");
+			if (!ethernet || !wifi) OsdWrite(1);
 
 			flip = (flip + 1) & 3;
 			if (hasbat && (flip & 2))

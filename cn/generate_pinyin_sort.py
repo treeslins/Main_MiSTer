@@ -7,7 +7,7 @@ from pypinyin import Style, pinyin
 
 ROOT = Path(__file__).resolve().parent
 data = (ROOT / "assets/misterfpga.cn").read_bytes()
-assert data[:8] == b"M16CN002"
+assert data[:8] == b"M16CN003"
 count = struct.unpack_from("<I", data, 12)[0]
 codes = [struct.unpack_from("<I", data, 16 + i * 40)[0] for i in range(count)]
 entries = []

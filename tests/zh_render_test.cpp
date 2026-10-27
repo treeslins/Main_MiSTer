@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <stdio.h>
+#include <utility>
 #include <vector>
 int main(int argc, char **argv) {
     uint8_t a[234],b[234],c[234],d[234];
@@ -110,6 +111,18 @@ int main(int argc, char **argv) {
     uint8_t menu_frame[16*256];
     ZhDrawPage(page,u8"系统设置",16,1,menu_frame,icons);
     assert(menu_frame[0]!=0); // Sidebar survives the 16-pixel menu layout.
+    for(const auto &pair : {std::pair<const char*,const char*>{u8"系统设置",u8"系"},
+                            {u8"核心列表",u8"核"}, {u8"其他选项",u8"其"}}) {
+        ZhPage empty;
+        ZhDrawPage(empty,pair.first,16,0,menu_frame,icons);
+        uint8_t top_glyph[16],bottom_glyph[16];
+        assert(ZhRender(pair.second,top_glyph,bottom_glyph,16)==12);
+        for(unsigned x=0;x<12;++x) {
+            assert(menu_frame[4*256+4+x]==(uint8_t)~top_glyph[x]);
+            assert(menu_frame[5*256+4+x]==(uint8_t)~bottom_glyph[x]);
+        }
+    }
+    ZhDrawPage(page,u8"系统设置",16,1,menu_frame,icons);
     // Pinning is a layout property, not a guarantee that column 40 contains ink.
     bool footer_ink=false;
     for(unsigned physical=14;physical<16;++physical)
@@ -118,7 +131,18 @@ int main(int argc, char **argv) {
     assert(footer_ink); // Pinned exit is visible in the bottom two OSD rows.
     assert(menu_frame[8*256+40]!=0); // Focused "About" stays in logical row 4.
     auto mixed=ZhMixedText("\x16");
-    assert(ZhRender(mixed.c_str(),a,b,8,false,false,0,icons)==8 && a[0]==3 && b[0]==0);
+    assert(ZhRender(mixed.c_str(),a,b,8,false,false,0,icons)==8 && a[0]==1 && b[0]==0);
+    icons[0x16][0]=0x7c; // Lower edge of the original inline submenu arrow.
+    ZhRender(mixed.c_str(),a,b,8,false,false,0,icons);
+    assert((((uint16_t)b[0]<<8)|a[0]) & (1u<<12));
+    assert(!((((uint16_t)b[0]<<8)|a[0]) & (1u<<13)));
+    for(unsigned char network_icon : {0x1c,0x1d}) {
+        icons[network_icon][0]=0x7f;
+        char icon_text[2]={(char)network_icon,0};
+        auto unicode_icon=ZhMixedText(icon_text);
+        assert(ZhRender(unicode_icon.c_str(),a,b,8,false,false,0,icons)==8);
+        assert((((uint16_t)b[0]<<8)|a[0])==0x07f0);
+    }
     auto toggle=ZhMixedText("\x0c A");
     ZhRender(toggle.c_str(),a,b,16,false,false,0,icons); assert(a[0]==255);
     if(argc>1) {
