@@ -32,7 +32,7 @@ module cn_osd240_pipeline(
    .read_header(rh), .read_row(rd_row), .read_column(rd_col),
    .read_data(rd_data));
  cn_osd240_pixel reader (
-   .clk(clk), .reset(reset), .x(pixel_x), .y(pixel_y),
+   .clk(clk), .reset(reset), .x(pixel_x), .y(pixel_y), .mode_224p(1'b0),
    .ram_data(rd_data), .ram_header(rh), .ram_row(rd_row),
    .ram_column(rd_col), .pixel(pixel), .active(active));
 endmodule
