@@ -28,10 +28,17 @@ wire cn240_video_pixel, cn240_video_active;
 // It is not automatic video-mode detection. Default 240p on power-up.
 wire cn240_mode_224p_sys;
 (* ASYNC_REG="TRUE" *) reg cn240_mode_224p_meta=0;
-(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_video=0;
+(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_sync=0;
+reg cn240_mode_224p_video=0;
+// Capture the requested mode only at the detected frame boundary.
+// This does not yet validate legacy osd_vcnt scanning or video scaling.
+reg cn240_vs_prev=0;
 always @(posedge clk_video) begin
  cn240_mode_224p_meta <= cn240_mode_224p_sys;
- cn240_mode_224p_video <= cn240_mode_224p_meta;
+ cn240_mode_224p_sync <= cn240_mode_224p_meta;
+ cn240_vs_prev <= vs_in;
+ if (!cn240_vs_prev && vs_in)
+   cn240_mode_224p_video <= cn240_mode_224p_sync;
 end
 // Synchronize the static mode request into the video domain. This is NOT
 // sufficient for synchronizing framebuffer writes or frame-atomic switching.
