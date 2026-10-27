@@ -28,8 +28,10 @@ reg cn240_line_step=0, cn240_frame_start=0;
 // The official horizontal counter changes only while ce_pix is asserted.
 // Keep the experiment's read-address coordinate stable across intermediate
 // video clocks, and latch on ce_pix instead of using the combinational tap.
-reg [7:0] cn240_scan_x=0;
-always @(posedge clk_video) if(ce_pix) cn240_scan_x <= osd_hcnt[7:0];
+reg [21:0] cn240_scan_x_full=0;
+wire [7:0] cn240_scan_x = cn240_scan_x_full[7:0];
+// Sample the entire coordinate atomically, including its range bits.
+always @(posedge clk_video) if(ce_pix) cn240_scan_x_full <= osd_hcnt;
 wire [7:0] cn240_scan_y;
 wire cn240_scan_running;
 cn_osd240_vscan cn240_vscan (
@@ -64,7 +66,7 @@ reg cn240_x_in_range_d1=0, cn240_x_in_range_d2=0;
 always @(posedge clk_video) begin
  cn240_running_d1 <= cn240_scan_running;
  cn240_running_d2 <= cn240_running_d1;
- cn240_x_in_range_d1 <= (osd_hcnt < 22'd256);
+ cn240_x_in_range_d1 <= (cn240_scan_x_full < 22'd256);
  cn240_x_in_range_d2 <= cn240_x_in_range_d1;
 end
 wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
