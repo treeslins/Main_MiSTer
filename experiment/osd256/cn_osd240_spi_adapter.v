@@ -9,8 +9,8 @@
 module cn_osd240_spi_adapter (
  input wire clk, input wire reset,
  input wire io_osd, input wire io_strobe, input wire [15:0] io_din,
- output reg enabled,
- output reg mode_224p,
+ output reg enabled = 1'b0,
+ output reg mode_224p = 1'b0,
  output reg ext_write, output reg ext_header,
  output reg [4:0] ext_row,
  output reg [7:0] ext_col, output reg [7:0] ext_data,
