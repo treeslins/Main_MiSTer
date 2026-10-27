@@ -33,7 +33,7 @@ module tb_pipeline_alignment;
  write_byte(0,0,0,8'h01); // y=24 -> 1
  write_byte(0,0,1,8'h02); // y=25 -> 1
  // Flush the pre-existing RAM read generated while setting up test data.
- @(negedge clk);y=8'd239;x=0;mode=0;
+ @(negedge clk);y=8'd255;x=0;mode=0;
  repeat(3) @(posedge clk);
  #1;
  if(active!==0) $fatal(1,"pipeline setup failed to flush");
@@ -43,12 +43,12 @@ module tb_pipeline_alignment;
  point(0,1,0,1,0);
  point(0,24,0,1,1);
  point(1,25,0,1,1);
- point(0,232,0,0,0);
+ point(0,248,0,0,0);
  point(0,216,1,0,0);
  point(0,24,1,1,1);
- point(0,232,0,0,0);
+ point(0,248,0,0,0);
  // drain last issued pixel
- point(0,239,0,0,0);
+ point(0,255,0,0,0);
  $display("PASS: moving coordinate pixel/data/valid alignment across RAM boundary");
  $finish;
  end

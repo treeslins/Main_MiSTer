@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// 240p CRT OSD experimental framebuffer: 13 x 16px menu entries
+// 256p OSD experimental framebuffer: 14 x 16px menu entries
 // with an independent 24px header. This is a separately testable component,
 // NOT yet connected to Menu_MiSTer or the ARM SPI protocol.
 module cn_osd240_ram (
@@ -15,7 +15,7 @@ module cn_osd240_ram (
     input wire [7:0] read_column,
     output reg [7:0] read_data
 );
-    localparam integer BODY_LINES = 26;
+    localparam integer BODY_LINES = 28;
     localparam integer HEADER_LINES = 3;
     localparam integer BODY_BYTES = BODY_LINES * 256;
     localparam integer HEADER_BYTES = HEADER_LINES * 256;

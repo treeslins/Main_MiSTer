@@ -36,6 +36,9 @@ module tb_bridge;
  if(header!==0 || row!==25 || col!==0) $fatal(1,"body bank wrong");
  payload(8'h80);
  if(col!==1) $fatal(1,"column not advancing");
+ command(8'hBB);
+ if(header!==0 || row!==27 || col!==0) $fatal(1,"last 256p body row rejected");
+ payload(8'h80);
  command(8'hC1);
  if(header!==1 || row!==1 || col!==0) $fatal(1,"header bank wrong");
  payload(8'hA1);
@@ -46,7 +49,7 @@ module tb_bridge;
  @(negedge clk);cv=0;dv=0;
  command(8'hBF);
  if(we!==0) $fatal(1,"invalid row unexpectedly written");
- $display("PASS: opt-in 240p protocol rejects invalid handshake and dispatches banked writes");
+ $display("PASS: opt-in protocol rejects invalid handshake and dispatches 256p bank writes");
  $finish;
  end
 endmodule

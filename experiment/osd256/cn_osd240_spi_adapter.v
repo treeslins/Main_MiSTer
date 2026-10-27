@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// SPI-transaction-facing, experimental 240p command adapter.
+// SPI-transaction-facing, experimental 256p command adapter.
 // Compatible with sys/osd.v's io_osd / io_strobe / io_din convention.
 // Protocol is intentionally inert until an explicit one-transaction opt-in:
 // command F0, payload 'C','N','2','4' (four bytes). F1 deactivates.
-// F2 payload row[0..25], 256 data bytes: body; F3 row[0..2], 256 bytes: header.
+// F2 payload row[0..27], 256 data bytes: body; F3 row[0..2], 256 bytes: header.
 // These F* commands are experimental and must be reserved in official RTL;
 // they are NOT standard MiSTer commands. No capability response yet.
 module cn_osd240_spi_adapter (
@@ -63,7 +63,7 @@ module cn_osd240_spi_adapter (
          if(count==0) begin
            ext_header<=command==8'hF3;
            ext_row<=io_din[4:0];
-           row_valid<=((command==8'hF2 && io_din[7:0]<26) ||
+           row_valid<=((command==8'hF2 && io_din[7:0]<28) ||
                        (command==8'hF3 && io_din[7:0]<3));
          end else if(count<=256 && row_valid) begin
            ext_write<=1;

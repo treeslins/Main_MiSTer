@@ -1,4 +1,4 @@
-name: Experimental 240p Chinese OSD HDL checks
+name: Experimental 256p Chinese OSD HDL checks
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install HDL tools
         run: sudo apt-get update && sudo apt-get install -y iverilog
-      - name: Verify 224p/240p display and memory budgets
+      - name: Verify 224p/256p display and memory budgets
         run: python3 experiment/osd256/test_memory_map.py
       - name: Compile and run SRAM/status-bar isolation simulation
         run: |
@@ -27,7 +27,7 @@ jobs:
             experiment/osd256/cn_osd240_ram.v \
             experiment/osd256/tb_cn_osd240_ram.v
           vvp /tmp/cn-osd240/test.vvp
-      - name: Compile and simulate full 240p pixel scan mapping
+      - name: Compile and simulate full 256p pixel scan mapping
         run: |
           iverilog -g2012 -Wall -s tb_scan -o /tmp/cn-osd240/scan.vvp \
             experiment/osd256/cn_osd240_ram.v \
@@ -66,11 +66,15 @@ jobs:
           assert 'quartus_sh --flow compile menu' in script
           assert 'if-no-files-found: error' in workflow
           assert 'self-hosted' in workflow
-          print('PASS: FPGA artifact cannot be published without integration and Quartus.')
+          assert 'fa83dc15b9545b58021f62738f0d69bba71ab187' in workflow
+          print('PASS: pinned FPGA build cannot publish without integration and Quartus.')
           PY
       - name: Elaborate modified actual upstream OSD module
         run: |
-          git clone --depth 1 https://github.com/MiSTer-devel/Menu_MiSTer.git /tmp/cn-menu-upstream
+          git init /tmp/cn-menu-upstream
+          git -C /tmp/cn-menu-upstream remote add origin https://github.com/MiSTer-devel/Menu_MiSTer.git
+          git -C /tmp/cn-menu-upstream fetch --depth 1 origin fa83dc15b9545b58021f62738f0d69bba71ab187
+          git -C /tmp/cn-menu-upstream checkout --detach FETCH_HEAD
           bash experiment/osd256/test_upstream_integration.sh /tmp/cn-menu-upstream
       - name: Test asynchronous framebuffer clocks
         run: |
@@ -78,16 +82,16 @@ jobs:
             experiment/osd256/cn_osd240_dualclock_ram.v \
             experiment/osd256/tb_cn_osd240_dualclock.v
           vvp /tmp/cn-osd240/dualclock.vvp
-      - name: Verify 240p scan timing under changing coordinates
+      - name: Verify 256p scan timing under changing coordinates
         run: |
           iverilog -g2012 -Wall -s tb_scan_stream -o /tmp/cn-osd240/scan_stream.vvp \
             experiment/osd256/cn_osd240_ram.v \
             experiment/osd256/cn_osd240_pixel.v \
             experiment/osd256/tb_cn_osd240_scan_stream.v
           vvp /tmp/cn-osd240/scan_stream.vvp
-      - name: Verify 224p and 240p active-area boundaries
+      - name: Verify 224p and 256p active-area boundaries
         run: |
-          iverilog -g2012 -Wall -s tb_224_240 -o /tmp/cn-osd240/modes.vvp \
+          iverilog -g2012 -Wall -s tb_224_256 -o /tmp/cn-osd240/modes.vvp \
             experiment/osd256/cn_osd240_pixel.v \
             experiment/osd256/tb_cn_osd240_mode.v
           vvp /tmp/cn-osd240/modes.vvp
@@ -97,17 +101,23 @@ jobs:
             experiment/osd256/cn_osd240_frame_mode.v \
             experiment/osd256/tb_cn_osd240_frame_mode.v
           vvp /tmp/cn-osd240/frame.vvp
-      - name: Test ARM-side experimental 240p SPI packet encoder
+      - name: Test ARM-side experimental 256p SPI packet encoder
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -o /tmp/cn-osd240/test_arm_spi \
             experiment/osd256/test_arm_spi.cpp
           /tmp/cn-osd240/test_arm_spi
-      - name: Simulate independent extended 240p vertical scan
+      - name: Simulate independent extended 256p vertical scan
         run: |
           iverilog -g2012 -Wall -s tb_vscan -o /tmp/cn-osd240/vscan.vvp \
             experiment/osd256/cn_osd240_vscan.v \
             experiment/osd256/tb_cn_osd240_vscan.v
           vvp /tmp/cn-osd240/vscan.vvp
+      - name: Verify one-cycle upstream scan event pulses
+        run: |
+          iverilog -g2012 -Wall -s tb_scan_pulses -o /tmp/cn-osd240/pulses.vvp \
+            experiment/osd256/cn_osd240_scan_pulses.v \
+            experiment/osd256/tb_cn_osd240_scan_pulses.v
+          vvp /tmp/cn-osd240/pulses.vvp
       - name: Verify moving-pixel RAM pipeline alignment
         run: |
           iverilog -g2012 -Wall -s tb_pipeline_alignment -o /tmp/cn-osd240/alignment.vvp \

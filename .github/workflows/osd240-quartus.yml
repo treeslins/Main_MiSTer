@@ -1,4 +1,4 @@
-name: 240p Menu FPGA Quartus build (integration gate)
+name: 256p Menu FPGA Quartus build (integration gate)
 
 on:
   workflow_dispatch:
@@ -21,18 +21,23 @@ jobs:
           quartus_sh --version
       - name: Fetch pinned upstream menu core
         run: |
-          git clone --depth 1 https://github.com/MiSTer-devel/Menu_MiSTer.git upstream-menu
+          git init upstream-menu
+          git -C upstream-menu remote add origin https://github.com/MiSTer-devel/Menu_MiSTer.git
+          git -C upstream-menu fetch --depth 1 origin fa83dc15b9545b58021f62738f0d69bba71ab187
+          git -C upstream-menu checkout --detach FETCH_HEAD
           git -C upstream-menu rev-parse HEAD | tee upstream-menu.sha
       - name: Apply our experimental OSD patch to upstream sources
         run: |
-          cp experiment/osd256/cn_osd240_{spi_adapter,dualclock_ram,pixel,frame_mode,vscan}.v upstream-menu/sys/
+          cp experiment/osd256/cn_osd240_{spi_adapter,dualclock_ram,pixel,frame_mode,scan_pulses,vscan}.v upstream-menu/sys/
           python3 experiment/osd256/apply_upstream_write_integration.py upstream-menu
       - name: Check for real FPGA integration and compile
         run: |
           bash experiment/osd256/build_menu_quartus.sh "$GITHUB_WORKSPACE/upstream-menu"
+          cp upstream-menu.sha dist/
+          quartus_sh --version > dist/quartus-version.txt
       - name: Upload experimental FPGA bitstream only after successful synthesis
         uses: actions/upload-artifact@v4
         with:
-          name: menu-cn-240p-experimental
+          name: menu-cn-256p-experimental
           path: dist/
           if-no-files-found: error

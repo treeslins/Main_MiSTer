@@ -27,7 +27,7 @@ inline bool send_mode(const Sender &s, bool use_224p) {
 inline bool send_row(const Sender &s, Bank bank, uint8_t row,
                      const uint8_t *data, std::size_t len) {
   if (!s.begin || !s.byte || !s.end || !data || len != 256) return false;
-  if (row >= (bank==Bank::Header ? 3 : 26)) return false;
+  if (row >= (bank==Bank::Header ? 3 : 28)) return false;
   s.begin(static_cast<uint8_t>(bank));
   s.byte(row);
   for (std::size_t i=0; i<256; ++i) s.byte(data[i]);

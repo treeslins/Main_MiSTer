@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Experimental 240p pixel-to-RAM address mapper. The RAM outputs the byte
+// Experimental 256p pixel-to-RAM address mapper. The RAM outputs the byte
 // on the clock after receiving this address; cn_osd240_pixel emits the
 // corresponding bit one clock later. Not connected to official sys/osd.v.
 module cn_osd240_pixel (
@@ -17,8 +17,8 @@ module cn_osd240_pixel (
 );
     wire is_header = (y < 8'd24);
     // 224p mode: 24px header + 192px body + 8px margin.
-    // 240p mode: 24px header + 208px body + 8px margin.
-    wire [7:0] body_end = mode_224p ? 8'd216 : 8'd232;
+    // 256p mode: 24px header + 224px body + 8px margin.
+    wire [7:0] body_end = mode_224p ? 8'd216 : 8'd248;
     wire is_body = (y >= 8'd24 && y < body_end);
     wire [7:0] body_y = y - 8'd24;
     wire [7:0] logical_y = is_header ? y : body_y;

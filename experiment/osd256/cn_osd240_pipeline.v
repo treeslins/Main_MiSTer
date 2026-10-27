@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// End-to-end 240p experimental datapath: command decoder -> banked RAM ->
+// End-to-end expanded experimental datapath: command decoder -> banked RAM ->
 // pixel scan. This module deliberately does NOT attach to MiSTer SPI wires.
 // It is a verification harness for memory/protocol consistency.
 module cn_osd240_pipeline(

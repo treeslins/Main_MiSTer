@@ -38,11 +38,11 @@ module tb_scan_stream;
      1: begin y=0; x=1; end
      2: begin y=31; x=0; end
      3: begin y=31; x=1; end
-     4: begin y=232; x=0; end
-     5: begin y=239; x=0; end
+     4: begin y=248; x=0; end
+     5: begin y=255; x=0; end
     endcase
     // Expectations are computed from the known initialized bytes.
-    expect_active_d0 = (y<232);
+    expect_active_d0 = (y<248);
     expect_pixel_d0 = ((y==0 || y==31) && x==0);
     @(posedge clk); #1;
     // The pixel stage consumes the PREVIOUS registered memory byte

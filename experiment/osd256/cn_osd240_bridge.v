@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Experimental *interface prototype*. This is not wired to official sys/osd.v.
+// Experimental interface model. This simplified bridge is not wired to sys/osd.v.
 // New 240p writes need an explicit capability unlock. Until then a separate
 // legacy marker is used, and no extended write may take place.
 module cn_osd240_bridge (
@@ -26,7 +26,7 @@ module cn_osd240_bridge (
  reg armed_row=0;
  reg header=0;
  reg [7:0] column=0;
- wire is_body = command>=8'hA0 && command<=8'hB9;
+ wire is_body = command>=8'hA0 && command<=8'hBB;
  wire is_header = command>=8'hC0 && command<=8'hC2;
  assign extended_header=header;
  assign extended_data=data_byte;

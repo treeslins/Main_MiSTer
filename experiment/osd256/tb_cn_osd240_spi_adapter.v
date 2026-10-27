@@ -29,19 +29,21 @@ initial begin
  @(negedge clk);
  if(enabled!==0 || mode_224p!==0) $fatal(1,"unsafe uninitialized FPGA power-up state");
  start_packet(8'h20);byte_in(8'hff);end_packet();
- if(enabled!==0) $fatal(1,"legacy command enabled 240p");
+ if(enabled!==0) $fatal(1,"legacy command enabled extension");
+ if(legacy!==1) $fatal(1,"ordinary legacy transaction was not left for stock OSD path");
  start_packet(8'hF0);byte_in(8'h43);byte_in(8'h4E);
  byte_in(8'h32);byte_in(8'h00);end_packet();
  if(enabled!==0) $fatal(1,"bad handshake accepted");
  start_packet(8'hF0);byte_in(8'h43);byte_in(8'h4E);
  byte_in(8'h32);byte_in(8'h34);end_packet();
  if(enabled!==1) $fatal(1,"valid handshake rejected");
+ if(legacy!==0) $fatal(1,"extension transaction incorrectly marked as legacy");
  start_packet(8'hF4);byte_in(8'h01);end_packet();
  if(mode_224p!==1) $fatal(1,"224p mode select failed");
  start_packet(8'hF4);byte_in(8'h02);end_packet();
  if(mode_224p!==1) $fatal(1,"invalid mode changed selection");
  start_packet(8'hF4);byte_in(8'h00);end_packet();
- if(mode_224p!==0) $fatal(1,"240p mode select failed");
+ if(mode_224p!==0) $fatal(1,"256p mode select failed");
  start_packet(8'hF2);byte_in(25);
  byte_in(8'h80);
  #1;
@@ -51,17 +53,23 @@ initial begin
  #1;
  if(!we || col!==1 || data!==8'h55) $fatal(1,"second byte mismatch");
  end_packet();
+ start_packet(8'hF2);byte_in(27);byte_in(8'hEE);
+ #1;
+ if(!we || row!==27 || col!==0 || data!==8'hEE)
+   $fatal(1,"last 256p body row was rejected");
+ end_packet();
  start_packet(8'hF3);byte_in(1);byte_in(8'hAA);
  #1;
  if(!we || header!==1 || row!==1 || col!==0 || data!==8'hAA)
    $fatal(1,"header write mismatch");
  end_packet();
- start_packet(8'hF2);byte_in(26);byte_in(8'hEE);
+ start_packet(8'hF2);byte_in(28);byte_in(8'hEE);
  #1;
  if(we) $fatal(1,"out-of-range body write allowed");
  end_packet();
  start_packet(8'hF1);end_packet();
  if(enabled!==0) $fatal(1,"disable failed");
+ if(legacy!==1) $fatal(1,"stock OSD fallback not restored after disable");
  start_packet(8'hF2);byte_in(0);byte_in(8'hff);
  #1;
  if(we) $fatal(1,"extension wrote while disabled");

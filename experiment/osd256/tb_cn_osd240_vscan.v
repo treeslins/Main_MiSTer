@@ -11,14 +11,12 @@ module tb_vscan;
  repeat(2) @(negedge clk);reset=0;start=1;
  @(negedge clk);start=0;
  if(y!==0 || !running) $fatal(1,"bad start");
- repeat(240) advance();
- if(y!==240 || !running) $fatal(1,"scan truncated at %d",y);
- repeat(15) advance();
+ repeat(255) advance();
  if(y!==255 || !running) $fatal(1,"bad final address");
  advance();
  if(running) $fatal(1,"Y wrapped without new frame");
  start=1;step=1;@(negedge clk);start=0;step=0;
  if(y!==0 || !running) $fatal(1,"frame priority failed");
- $display("PASS: full 240-line scan beyond legacy 128px wrap");$finish;
+ $display("PASS: full 256-line scan beyond legacy 128px wrap");$finish;
  end
 endmodule

@@ -22,10 +22,10 @@ module tb_frame_mode;
  tick(5);
  if(actual!==1) $fatal(1,"switched with VS held high");
  vs=0;tick(4);vs=1;tick(2);
- if(actual!==0) $fatal(1,"failed to select 240p at next frame");
+ if(actual!==0) $fatal(1,"failed to select 256p at next frame");
  reset=1;tick(2);
- if(actual!==0) $fatal(1,"reset did not restore 240p default");
- $display("PASS: frame-atomic 224p/240p latch, held VSYNC and reset");
+ if(actual!==0) $fatal(1,"reset did not restore 256p default");
+ $display("PASS: frame-atomic 224p/256p latch, held VSYNC and reset");
  $finish;
  end
 endmodule

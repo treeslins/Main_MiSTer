@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Apply *opt-in* 240p write-bank hardware to an upstream Menu_MiSTer tree.
-This is NOT the final 240p display implementation and MUST NOT be packaged
-as a 240p menu.rbf. Called solely for syntax/elaboration integration checks.
+"""Apply experimental 256p OSD read/write and output routing to Menu_MiSTer.
+This is not hardware-validated and must not be represented as installable.
+The resulting source is used for HDL elaboration and Quartus build attempts.
 """
 from pathlib import Path
 import sys
@@ -12,9 +12,10 @@ text=p.read_text()
 needle="reg        osd_enable;"
 if text.count(needle)!=1:
     raise SystemExit("Upstream osd.v structure changed; refuse unsafe patch")
-insertion="""// CN_OSD240_WRITE_EXPERIMENT (not yet complete video integration).
+insertion="""// CN_OSD240_INTEGRATED experimental video output path.
 // This write-bank subsystem remains isolated from the legacy osd_buffer.
-// Pixel-clock readout now samples the real legacy OSD scan counters.\n// Existing output mux still selects only legacy pixels.
+// Pixel-clock readout follows the real OSD scan timing and is confined to
+// the 256x256 experiment window; outside it the legacy OSD remains selected.
 wire cn240_enabled;
 wire cn240_write, cn240_header;
 wire [4:0] cn240_row;
@@ -24,7 +25,7 @@ wire cn240_video_header;
 wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
-reg cn240_line_step=0, cn240_frame_start=0;
+wire cn240_line_step, cn240_frame_start;
 // The official horizontal counter changes only while ce_pix is asserted.
 // Keep the experiment's read-address coordinate stable across intermediate
 // video clocks, and latch on ce_pix instead of using the combinational tap.
@@ -39,13 +40,19 @@ cn_osd240_vscan cn240_vscan (
  .frame_start(cn240_frame_start), .line_step(cn240_line_step),
  .y(cn240_scan_y), .running(cn240_scan_running)
 );
+cn_osd240_scan_pulses cn240_scan_events (
+ .clk_video(clk_video), .reset(1'b0), .ce_pix(ce_pix),
+ .line_start(de_in && !deD), .line_advance(osd_div == multiscan),
+ .frame_start_event(v_osd_start == v_cnt),
+ .line_step(cn240_line_step), .frame_start(cn240_frame_start)
+);
 // Explicit experimental video-height request, clocked by the SPI domain.
-// It is not automatic video-mode detection. Default 240p on power-up.
-wire cn240_mode_224p_sys;
+// It is not automatic video-mode detection. Default 256p on power-up.
+wire cn240_mode_224p_requested;
 wire cn240_mode_224p_video;
 cn_osd240_frame_mode cn240_frame_latch (
  .clk_video(clk_video), .reset(1'b0),
- .requested_224p_async(cn240_mode_224p_sys), .vs_in(vs_in),
+ .requested_224p_async(cn240_mode_224p_requested), .vs_in(vs_in),
  .mode_224p(cn240_mode_224p_video)
 );
 // Synchronize the static mode request into the video domain. This is NOT
@@ -69,9 +76,11 @@ always @(posedge clk_video) begin
  cn240_x_in_range_d1 <= (cn240_scan_x_full < 22'd256);
  cn240_x_in_range_d2 <= cn240_x_in_range_d1;
 end
-wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
-// Demonstrate use of the genuine pixel clock and a registered read port.
-// Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
+wire cn240_mux_pixel = (cn240_enabled_video && cn240_running_d2 &&
+                        cn240_x_in_range_d2 && cn240_video_active) ?
+                       cn240_video_pixel : osd_pixel;
+// Use the genuine pixel clock and registered extension read port.
+// The SPI adapter resets its per-transaction parser when !io_osd.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
  .x(cn240_scan_x), .y(cn240_scan_y), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
@@ -82,7 +91,7 @@ cn_osd240_pixel cn240_reader (
 cn_osd240_spi_adapter cn240_spi (
  .clk(clk_sys), .reset(1'b0),
  .io_osd(io_osd), .io_strobe(io_strobe), .io_din(io_din),
- .enabled(cn240_enabled), .mode_224p(cn240_mode_224p_sys),
+ .enabled(cn240_enabled), .mode_224p(cn240_mode_224p_requested),
  .ext_write(cn240_write),
  .ext_header(cn240_header), .ext_row(cn240_row),
  .ext_col(cn240_col), .ext_data(cn240_data),
@@ -96,8 +105,7 @@ cn_osd240_dualclock_ram cn240_bank (
  .rd_data(cn240_video_read)
 );
 """
-# Intentionally guard the original display implementation untouched.
-text=text.replace(needle,insertion+"\n"+needle)
+# Keep the original OSD enable state and storage declarations in place.
 # Move existing OSD scan counters from the local clocked block to module scope
 # so the independent experimental read path can observe their true values.
 marker="\treg [21:0] osd_vcnt;"
@@ -105,44 +113,44 @@ marker2="\treg [21:0] osd_hcnt;"
 if text.count(marker)!=1 or text.count(marker2)!=1:
     raise SystemExit("OSD scan-counter layout changed; refusing patch")
 text=text.replace(marker,"",1).replace(marker2,"",1)
+v_counter="reg [21:0] v_cnt;"
+if text.count(v_counter)!=1:
+    raise SystemExit("OSD vertical counter layout changed; refusing patch")
+text=text.replace(v_counter,"",1)
 scope="reg        osd_enable;"
-text=text.replace(scope,"reg [21:0] osd_vcnt;\nreg [21:0] osd_hcnt;\n"+scope,1)
-# Tap official vertical scan divider at its native rising-DE update.
-# These are pulses in clk_video, registered in the original clocked block.
+text=text.replace(scope,"reg [21:0] osd_vcnt;\nreg [21:0] osd_hcnt;\nreg [21:0] v_cnt;\nreg        deD;\nreg  [2:0] osd_div;\nreg  [2:0] multiscan;\nreg [21:0] v_osd_start;\nreg  [1:0] osd_en;\n"+scope,1)
+# Promote scan state referenced by the independent event and output logic.
+for declaration in ("\treg        deD;", "\treg  [2:0] osd_div;",
+                    "\treg  [2:0] multiscan;", "\treg [21:0] v_osd_start;",
+                    "\treg  [1:0] osd_en;"):
+    if text.count(declaration)!=1:
+        raise SystemExit(f"OSD scan-state layout changed; refusing patch: {declaration!r}")
+    text=text.replace(declaration,"",1)
+# Place extension references after their upstream clock/scan declarations to
+# avoid implicit nets in both Icarus and Quartus Verilog elaboration.
+pixel_enable_decl="(* direct_enable *) reg ce_pix;"
+if text.count(pixel_enable_decl)!=1:
+    raise SystemExit("Upstream pixel-enable declaration changed; refusing patch")
+text=text.replace(pixel_enable_decl,pixel_enable_decl+"\n\n"+insertion,1)
+# Confirm the official vertical scan event anchor before using it below.
 edge_anchor="\t\tif(de_in && !deD) begin"
 assert text.count(edge_anchor)==1, "upstream DE edge structure changed"
-text=text.replace(edge_anchor,"\t\tcn240_line_step <= 0;\n\t\tcn240_frame_start <= 0;\n"+edge_anchor,1)
-text=text.replace(edge_anchor,"\t\tif(de_in && !deD) begin\n\t\t\tcn240_line_step <= (osd_div == multiscan);\n\t\t\tcn240_frame_start <= (v_osd_start == v_cnt);",1)
 
-# Compile-time gated first video-mux integration. It stays OFF in the
-# ordinary upstream build; this only checks syntax of the opt-in branch.
-# The actual 224p/240p CRT-safe coordinate and CDC design is still pending.
-mux_anchor="\tordout1 <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},"
-assert text.count(mux_anchor)==1, "upstream video mixer changed"
-text=text.replace(mux_anchor, """\t// The existing legacy output remains the default in all builds.
-\t// ENABLE ONLY for waveform-level investigation; this does not yet
-\t// implement safe scan scaling or a synchronized mode transition.
-\t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tordout1 <= {{cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[2], din[23:19]},
-\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[1], din[15:11]},
-\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[0], din[7:3]}};
-\t`else
-"""+mux_anchor,1)
-end_anchor="\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"
-assert text.count(end_anchor)==1
-text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
-# The original osd_mux is only valid for the legacy 128px raster. In the
-# explicitly unsafe preview, use the extended active flag instead, while
-# falling back to the original enabled area when the extension is off.
-# This is NOT sufficient for production timing/geometry verification.
+# Connect the extension to the output raster. It remains selected only after
+# explicit extension opt-in and while the upstream OSD itself is enabled.
+legacy_pixels="""\tordout1 <= {{osd_pixel, osd_pixel, OSD_COLOR[2], din[23:19]},// 23:16
+\t            {osd_pixel, osd_pixel, OSD_COLOR[1], din[15:11]},// 15:8
+\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"""
+assert text.count(legacy_pixels)==1, "upstream legacy color mapper changed"
+extended_pixels="""\tordout1 <= {{cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[2], din[23:19]},// 23:16
+\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[1], din[15:11]},// 15:8
+\t            {cn240_mux_pixel, cn240_mux_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"""
+text=text.replace(legacy_pixels,extended_pixels,1)
 mux_gate="\tosd_mux <= ~osd_de[2];"
 assert text.count(mux_gate)==1, "legacy OSD active mux changed"
-text=text.replace(mux_gate, """\t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tosd_mux <= ~(cn240_enabled_video ? (cn240_running_d2 && cn240_x_in_range_d2 && cn240_video_active) : osd_de[2]);
-\t`else
-"""+mux_gate+"\n\t`endif",1)
+text=text.replace(mux_gate, "\tosd_mux <= ~((cn240_enabled_video && osd_en[1]) ? (cn240_running_d2 && cn240_x_in_range_d2 && cn240_video_active) : osd_de[2]);",1)
 # Add the mode command as a separate selected SPI transaction (F4,
-# one payload byte: 0 = 240p, 1 = 224p). The adapter exports its mode
+# one payload byte: 0 = 256p, 1 = 224p). The adapter exports its mode
 # register; this wire assignment connects it to the two-stage synchronizer.
 # The selected mode is still experimental and not read back by ARM.
 p.write_text(text)
@@ -152,5 +160,6 @@ q.write_text(q.read_text()+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_dualclock_ram.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_frame_mode.v ]\n'+
+ 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_scan_pulses.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_vscan.v ]\n')
-print("Applied scan-counter tap and dualclock RAM with persistent SPI mode; legacy video unchanged")
+print("Applied expanded video output path, one-cycle scan events, and isolated dualclock RAM")

@@ -39,23 +39,23 @@ initial begin
  if(ready!==0) $fatal(1,"extension incorrectly on before handshake");
  issue(8'hE0);issue(8'h43);issue(8'h4E);issue(8'h32);issue(8'h34);
  if(ready!==1) $fatal(1,"extension handshake failed");
- // Body physical row 0 bit 0 -> 240p y=24
+ // Body physical row 0 bit 0 -> 256p y=24
  issue(8'hA0);write_byte(8'h01);
- // Body physical row 25 bit 7 -> 240p y=231
- issue(8'hB9);write_byte(8'h80);
- // Header physical row 0 bit 0 -> 240p y=0
+ // Body physical row 27 bit 7 -> 256p y=247
+ issue(8'hBB);write_byte(8'h80);
+ // Header physical row 0 bit 0 -> 256p y=0
  issue(8'hC0);write_byte(8'h01);
- // Header physical row 2 bit 7 -> 240p y=23
+ // Header physical row 2 bit 7 -> 256p y=23
  issue(8'hC2);write_byte(8'h80);
  check_pixel(0,1,1);
  check_pixel(1,1,0);
  check_pixel(23,1,1);
  check_pixel(24,1,1);
  check_pixel(25,1,0);
- check_pixel(231,1,1);
- check_pixel(232,0,0);
- check_pixel(239,0,0);
- $display("PASS: protocol->separate SRAM banks->240p scan boundaries");
+ check_pixel(247,1,1);
+ check_pixel(248,0,0);
+ check_pixel(255,0,0);
+ $display("PASS: protocol->separate SRAM banks->256p scan boundaries");
  $finish;
 end
 endmodule

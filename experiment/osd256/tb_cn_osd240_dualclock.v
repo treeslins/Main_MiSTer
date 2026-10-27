@@ -22,14 +22,14 @@ begin
 end endtask
 initial begin
  put(0,0,0,8'h11);
- put(0,25,255,8'h9a);
+ put(0,27,255,8'h9a);
  put(1,0,0,8'h42);
  put(1,2,255,8'h81);
  check(0,0,0,8'h11);
- check(0,25,255,8'h9a);
+ check(0,27,255,8'h9a);
  check(1,0,0,8'h42);
  check(1,2,255,8'h81);
- check(0,26,0,0);
+ check(0,28,0,0);
  check(1,3,0,0);
  $display("PASS: independent SPI/video clocks, bank separation and bounds");
  $finish;

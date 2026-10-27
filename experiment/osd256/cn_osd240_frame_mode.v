@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Latch 224p/240p request on the selected incoming video frame edge.
+// Latch 224p/256p request on the selected incoming video frame edge.
 // Explicit active-high rising-edge semantics; this is not automatic
 // detection of VSYNC polarity. Integration must verify actual video polarity.
 module cn_osd240_frame_mode(

@@ -27,14 +27,14 @@ initial begin
     put(1,0,8'hff); // header row 0 (y0..7)
     put(1,2,8'hff); // header row 2 (y16..23)
     put(0,0,8'hff); // body first row (y24..31)
-    put(0,25,8'hff); // body last row (y224..231)
+    put(0,27,8'hff); // body last row (y240..247)
     sample(0,1); if(pixel!==1) $fatal(1,"header top missing");
     sample(23,1); if(pixel!==1) $fatal(1,"header bottom missing");
     sample(24,1); if(pixel!==1) $fatal(1,"body top missing");
-    sample(231,1); if(pixel!==1) $fatal(1,"body bottom missing");
-    sample(232,0); if(pixel!==0) $fatal(1,"invalid area must have a zero pixel");
-    sample(239,0); if(pixel!==0) $fatal(1,"bottom margin must be blank");
-    $display("PASS: 24px status + 208px body + 8px margin scan addressing");
+    sample(247,1); if(pixel!==1) $fatal(1,"body bottom missing");
+    sample(248,0); if(pixel!==0) $fatal(1,"invalid area must have a zero pixel");
+    sample(255,0); if(pixel!==0) $fatal(1,"bottom margin must be blank");
+    $display("PASS: 24px status + 224px body + 8px margin scan addressing");
     $finish;
 end
 endmodule

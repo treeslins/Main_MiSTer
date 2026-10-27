@@ -7,7 +7,7 @@ GLYPH_HEIGHT=16
 STATUS_HEIGHT=24
 BOTTOM_MARGIN=8
 STATUS_STORAGE_ROWS=4   # 1024 bytes, aligned for special menu status
-TOTAL_ROWS_CRT_240=240
+TOTAL_ROWS_CRT_256=256
 TOTAL_ROWS_CRT_224=224
 
 @dataclass(frozen=True)
@@ -18,8 +18,8 @@ class BankAddress:
     stop: int
 
 def geometry(screen_height: int):
-    if screen_height not in (224,240):
-        raise ValueError("supported design targets: 224p and 240p")
+    if screen_height not in (224,256):
+        raise ValueError("supported design targets: 224p and 256p")
     available=screen_height-STATUS_HEIGHT-BOTTOM_MARGIN
     lines=available//GLYPH_HEIGHT
     return {
@@ -52,12 +52,11 @@ def verify(screen_height):
     assert g["margin"] >= BOTTOM_MARGIN
     assert g["body_rows"] <= 30
     assert max(record.stop for record in records) <= body_bytes+g["header_bytes"]
-    # Reserve high line indices / a separate command bank for status, NOT
-    # existing legacy rows 16..18. Hardware bank handling is not yet written.
+    # Status uses its own logical bank; it cannot alias body rows 16..18.
     return g
 
 def main():
-    for height in (TOTAL_ROWS_CRT_224,TOTAL_ROWS_CRT_240):
+    for height in (TOTAL_ROWS_CRT_224,TOTAL_ROWS_CRT_256):
         cfg=verify(height)
         print(f"PASS {height}p: {cfg['logical_lines']} rows of 16px, "
               f"{cfg['body_height']}px body + {STATUS_HEIGHT}px status + "

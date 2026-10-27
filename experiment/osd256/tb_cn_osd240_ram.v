@@ -37,6 +37,7 @@ module tb;
         put(0,17,0,8'hB1);
         put(0,18,0,8'hB2);
         put(0,25,255,8'hCF);
+        put(0,27,255,8'hDF);
         // Status bank shares row numbers without aliasing body addresses.
         put(1,0,0,8'hD0);
         put(1,1,0,8'hD1);
@@ -47,17 +48,18 @@ module tb;
         expect_byte(0,17,0,8'hB1);
         expect_byte(0,18,0,8'hB2);
         expect_byte(0,25,255,8'hCF);
+        expect_byte(0,27,255,8'hDF);
         expect_byte(1,0,0,8'hD0);
         expect_byte(1,1,0,8'hD1);
         expect_byte(1,2,255,8'hD2);
         // Out-of-range access must be ignored.
-        put(0,26,0,8'hEE);
+        put(0,28,0,8'hEE);
         put(1,3,0,8'hEE);
-        expect_byte(0,26,0,8'h00);
+        expect_byte(0,28,0,8'h00);
         expect_byte(1,3,0,8'h00);
         expect_byte(0,17,0,8'hB1);
         expect_byte(1,1,0,8'hD1);
-        $display("PASS: 240p menu SRAM/header SRAM isolated, all boundary cases");
+        $display("PASS: 256p menu SRAM/header SRAM isolated, all boundary cases");
         $finish;
     end
 endmodule
