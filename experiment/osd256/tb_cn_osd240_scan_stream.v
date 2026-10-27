@@ -17,7 +17,7 @@ module tb_scan_stream;
   .write_header(wh),.write_row(wr),.write_column(wc),.write_data(wd),
   .read_header(rh),.read_row(rr),.read_column(rc),.read_data(rd));
  cn_osd240_pixel scanner(.clk(clk),.reset(reset),.x(x),.y(y),
-  .ram_data(rd),.ram_header(rh),.ram_row(rr),.ram_column(rc),
+  .mode_224p(1'b0), .ram_data(rd),.ram_header(rh),.ram_row(rr),.ram_column(rc),
   .pixel(pixel),.active(active));
  task put(input bank,input [4:0] row,input [7:0] col,input [7:0] data);
  begin
