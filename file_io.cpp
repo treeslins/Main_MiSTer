@@ -1393,8 +1393,62 @@ static std::string pinyin_sort_key(const char *name, size_t len)
 	return key;
 }
 
+static const char *file_sort_name(const direntext_t& item, int options)
+{
+	const char *name = item.altname;
+	// Core folders hide their leading underscore in the OSD; sort by the
+	// same visible name so their order agrees with the quick-jump key.
+	if ((options & SCANO_CORES) && item.de.d_type == DT_DIR && name[0] == '_' && name[1]) ++name;
+	return name;
+}
+
+static uint32_t file_first_codepoint(const char *name)
+{
+	const unsigned char *p = (const unsigned char *)name;
+	if (p[0] < 0x80) return p[0];
+	if ((p[0] & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80)
+		return ((uint32_t)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+	if ((p[0] & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80)
+		return ((uint32_t)(p[0] & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+	return p[0];
+}
+
+static int chinese_name_group(const char *name)
+{
+	uint32_t cp = file_first_codepoint(name);
+	if (cp >= '0' && cp <= '9') return 0;
+	if ((cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z')) return 1;
+	if (cp >= 0x3400 && cp <= 0x9FFF) return 2;
+	return 3;
+}
+
+static bool chinese_directory_first(const direntext_t& item)
+{
+	// ZIP archives are navigable, so the scanner marks them DT_DIR, but
+	// they are ROM files for ordering purposes. Keep physical folders first.
+	return item.de.d_type == DT_DIR && !(item.flags & DT_EXT_ZIP);
+}
+
+static uint32_t file_jump_key(const direntext_t& item, int options)
+{
+	const bool directory = OsdChinese() ? chinese_directory_first(item) : item.de.d_type == DT_DIR;
+	const char *name = file_sort_name(item, options);
+	if (directory && !strcmp(name, "..")) return 0;
+	uint32_t cp = file_first_codepoint(name);
+	if (!OsdChinese()) return (directory ? 0x10000 : 0x20000) | (uint32_t)toupper((unsigned char)name[0]);
+	const int group = chinese_name_group(name);
+	unsigned initial = '#';
+	if (group == 0 || group == 1) initial = (unsigned)toupper((unsigned char)name[0]);
+	else if (group == 2) {
+		const char *reading = pinyin_for(cp);
+		if (reading) initial = (unsigned)toupper((unsigned char)reading[0]);
+	}
+	return (directory ? 0x10000 : 0x20000) | ((uint32_t)group << 8) | initial;
+}
+
 struct DirentComp
 {
+	explicit DirentComp(int opts) : options(opts), chinese(OsdChinese()) {}
 	bool operator()(const direntext_t& de1, const direntext_t& de2)
 	{
 
@@ -1410,24 +1464,34 @@ struct DirentComp
 		if (parent1 != parent2) return parent1;
 		if (parent1) return false;
 
-		if ((de1.de.d_type == DT_DIR) && (de2.de.d_type != DT_DIR)) return true;
-		if ((de1.de.d_type != DT_DIR) && (de2.de.d_type == DT_DIR)) return false;
+		const bool dir1 = chinese ? chinese_directory_first(de1) : de1.de.d_type == DT_DIR;
+		const bool dir2 = chinese ? chinese_directory_first(de2) : de2.de.d_type == DT_DIR;
+		if (dir1 != dir2) return dir1;
 
-		int len1 = strlen(de1.altname);
-		int len2 = strlen(de2.altname);
-		if ((len1 > 4) && (de1.altname[len1 - 4] == '.')) len1 -= 4;
-		if ((len2 > 4) && (de2.altname[len2 - 4] == '.')) len2 -= 4;
+		const char *name1 = chinese ? file_sort_name(de1, options) : de1.altname;
+		const char *name2 = chinese ? file_sort_name(de2, options) : de2.altname;
+		int len1 = strlen(name1);
+		int len2 = strlen(name2);
+		if ((len1 > 4) && (name1[len1 - 4] == '.')) len1 -= 4;
+		if ((len2 > 4) && (name2[len2 - 4] == '.')) len2 -= 4;
 
 		int len = (len1 < len2) ? len1 : len2;
 		int ret = 0;
-		if (OsdChinese())
+		if (chinese)
 		{
-			std::string key1 = pinyin_sort_key(de1.altname, len1);
-			std::string key2 = pinyin_sort_key(de2.altname, len2);
-			ret = key1.compare(key2);
-			if (ret) return ret < 0;
+			// Directory priority is handled above. Within each type, keep
+			// digits, Latin names and Hanzi in separate contiguous sections.
+			const int group1 = chinese_name_group(name1);
+			const int group2 = chinese_name_group(name2);
+			if (group1 != group2) return group1 < group2;
+			if (group1 == 2) {
+				std::string key1 = pinyin_sort_key(name1, len1);
+				std::string key2 = pinyin_sort_key(name2, len2);
+				ret = key1.compare(key2);
+				if (ret) return ret < 0;
+			}
 		}
-		ret = strncasecmp(de1.altname, de2.altname, len);
+		ret = strncasecmp(name1, name2, len);
 		if (!ret)
 		{
 			if(len1 != len2)
@@ -1441,6 +1505,8 @@ struct DirentComp
 	}
 
 	size_t iterations = 0;
+	int options;
+	bool chinese;
 };
 
 void AdjustDirectory(char *path)
@@ -1918,7 +1984,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		printf("Got %d dir entries\n", flist_nDirEntries());
 		if (!flist_nDirEntries()) return 0;
 
-		std::sort(DirItem.begin(), DirItem.end(), DirentComp());
+		std::sort(DirItem.begin(), DirItem.end(), DirentComp(options));
 		if (file_name[0])
 		{
 			int pos = -1;
@@ -2016,24 +2082,11 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_NEXT_CHAR)
 		{
-			//DirItem is sorted, so just advance until the first character changes.
-			//if we reach the end before that don't change anything.
-			//If we change d_type also consider that 'next'. This means next
-			//advances through directories, and then advances through files
-			//
 			int found = -1;
-			char curdType = DirItem[iSelectedEntry].de.d_type;
-			char curChar = DirItem[iSelectedEntry].altname[0];
-			if ((curChar == '_') && (curdType == DT_DIR) && (options & SCANO_CORES))
-				curChar = DirItem[iSelectedEntry].altname[1];
-			curChar = toupper(curChar);
-
+			const uint32_t current = file_jump_key(DirItem[iSelectedEntry], options);
 			for (int i = iSelectedEntry+1; i < flist_nDirEntries(); i++)
 			{
-				char tryChar = DirItem[i].altname[0];
-				if ((tryChar == '_') && (DirItem[i].de.d_type == DT_DIR) && (options & SCANO_CORES))
-					tryChar = DirItem[i].altname[1];
-				if (toupper(tryChar) != curChar || DirItem[i].de.d_type != curdType)
+				if (file_jump_key(DirItem[i], options) != current)
 				{
 					found = i;
 					break;
@@ -2047,36 +2100,14 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_PREV_CHAR)
 		{
-			//Previous seek seeks to the FIRST entry that starts with the previous letter
-			//Search backward until the first char changes, and then continue looking backward
-			//until it changes again.
-
-
 			int found = -1;
-			char curdType = DirItem[iSelectedEntry].de.d_type;
-			bool sawChange = false;
-			char curChar = DirItem[iSelectedEntry].altname[0];
-			if ((curChar == '_') && (curdType == DT_DIR) && (options & SCANO_CORES))
-				curChar = DirItem[iSelectedEntry].altname[1];
-			curChar = toupper(curChar);
-			for (int i = iSelectedEntry-1; i >= 0; i--)
-			{
-				char tryChar = DirItem[i].altname[0];
-				if ((tryChar == '_') && (DirItem[i].de.d_type == DT_DIR) && (options & SCANO_CORES))
-					tryChar = DirItem[i].altname[1];
-				if (toupper(tryChar) != curChar || DirItem[i].de.d_type != curdType)
-				{
-					if (sawChange)
-					{
-						found = i+1;
-						break;
-					}
-					sawChange = true;
-					curChar = DirItem[i].altname[0];
-					if (curChar == '_')
-						curChar = DirItem[i].altname[1];
-					curChar = toupper(curChar);
-				}
+			int first = iSelectedEntry;
+			const uint32_t current = file_jump_key(DirItem[first], options);
+			while (first > 0 && file_jump_key(DirItem[first-1], options) == current) --first;
+			if (first > 0) {
+				const uint32_t previous = file_jump_key(DirItem[first-1], options);
+				while (first > 0 && file_jump_key(DirItem[first-1], options) == previous) --first;
+				found = first;
 			}
 			if (found >= 0)
 			{
