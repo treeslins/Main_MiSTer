@@ -108,6 +108,13 @@ jobs:
             experiment/osd256/cn_osd240_vscan.v \
             experiment/osd256/tb_cn_osd240_vscan.v
           vvp /tmp/cn-osd240/vscan.vvp
+      - name: Verify moving-pixel RAM pipeline alignment
+        run: |
+          iverilog -g2012 -Wall -s tb_pipeline_alignment -o /tmp/cn-osd240/alignment.vvp \
+            experiment/osd256/cn_osd240_ram.v \
+            experiment/osd256/cn_osd240_pixel.v \
+            experiment/osd256/tb_cn_osd240_pipeline_alignment.v
+          vvp /tmp/cn-osd240/alignment.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
