@@ -27,19 +27,12 @@ wire cn240_video_pixel, cn240_video_active;
 // Explicit experimental video-height request, clocked by the SPI domain.
 // It is not automatic video-mode detection. Default 240p on power-up.
 wire cn240_mode_224p_sys;
-(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_meta=0;
-(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_sync=0;
-reg cn240_mode_224p_video=0;
-// Capture the requested mode only at the detected frame boundary.
-// This does not yet validate legacy osd_vcnt scanning or video scaling.
-reg cn240_vs_prev=0;
-always @(posedge clk_video) begin
- cn240_mode_224p_meta <= cn240_mode_224p_sys;
- cn240_mode_224p_sync <= cn240_mode_224p_meta;
- cn240_vs_prev <= vs_in;
- if (!cn240_vs_prev && vs_in)
-   cn240_mode_224p_video <= cn240_mode_224p_sync;
-end
+wire cn240_mode_224p_video;
+cn_osd240_frame_mode cn240_frame_latch (
+ .clk_video(clk_video), .reset(1'b0),
+ .requested_224p_async(cn240_mode_224p_sys), .vs_in(vs_in),
+ .mode_224p(cn240_mode_224p_video)
+);
 // Synchronize the static mode request into the video domain. This is NOT
 // sufficient for synchronizing framebuffer writes or frame-atomic switching.
 (* ASYNC_REG="TRUE" *) reg cn240_enabled_meta=0;
@@ -113,5 +106,6 @@ q=root/"sys/sys.qip"
 q.write_text(q.read_text()+
  '\nset_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_spi_adapter.v ]\n'+
  'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_dualclock_ram.v ]\n'+
- 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n')
+ 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_pixel.v ]\n'+
+ 'set_global_assignment -name VERILOG_FILE [file join $::quartus(qip_path) cn_osd240_frame_mode.v ]\n')
 print("Applied scan-counter tap and dualclock RAM with persistent SPI mode; legacy video unchanged")
