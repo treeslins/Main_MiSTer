@@ -49,6 +49,13 @@ always @(posedge clk_video) begin
  cn240_enabled_meta <= cn240_enabled;
  cn240_enabled_video <= cn240_enabled_meta;
 end
+// Align the running gate to the registered RAM pixel and active outputs.
+// Both control and pixel are sampled by the mux on the same video clock.
+reg cn240_running_d1=0, cn240_running_d2=0;
+always @(posedge clk_video) begin
+ cn240_running_d1 <= cn240_scan_running;
+ cn240_running_d2 <= cn240_running_d1;
+end
 wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
 // Demonstrate use of the genuine pixel clock and a registered read port.
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
@@ -118,7 +125,7 @@ text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
 mux_gate="\tosd_mux <= ~osd_de[2];"
 assert text.count(mux_gate)==1, "legacy OSD active mux changed"
 text=text.replace(mux_gate, """\t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tosd_mux <= ~(cn240_enabled_video ? (cn240_scan_running && cn240_video_active) : osd_de[2]);
+\tosd_mux <= ~(cn240_enabled_video ? (cn240_running_d2 && cn240_video_active) : osd_de[2]);
 \t`else
 """+mux_gate+"\n\t`endif",1)
 # Add the mode command as a separate selected SPI transaction (F4,
