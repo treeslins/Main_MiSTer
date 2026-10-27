@@ -777,6 +777,7 @@ static void zh_compose()
 // menu.rbf does not understand F0-F4, and there is no feature handshake yet.
 // Use only with a matching experimental FPGA bitstream.
 static bool osd240_explicitly_enabled=false;
+static bool osd240_use_224p=false;
 static void cn240_begin(uint8_t command) { spi_osd_cmd_cont(command); }
 static void cn240_byte(uint8_t value) { spi_b(value); }
 static void cn240_end() { DisableOsd(); }
@@ -784,6 +785,7 @@ static const cn_osd240::Sender cn240_sender={cn240_begin, cn240_byte, cn240_end}
 
 void OsdExperimental240Enable(bool enable, bool mode224)
 {
+    osd240_use_224p=mode224;
     if(enable && !osd240_explicitly_enabled) {
         cn_osd240::send_enable(cn240_sender);
         cn_osd240::send_mode(cn240_sender, mode224);
@@ -824,7 +826,7 @@ void OsdUpdate()
     // framebuffer and is never sent to a normal menu.rbf.
     if(osd240_explicitly_enabled && OsdChinese() && is_menu() && !zh_info) {
         // Future UI wiring will choose this from the actual output mode.
-        const unsigned menu_rows=13;
+        const unsigned menu_rows=osd240_use_224p ? 12u : 13u;
         uint8_t expanded[26*256];
         ZhDrawPageExtended(zh_page,osd_size,arrow,expanded,menu_rows,charfont);
         for(unsigned i=0;i<menu_rows*2;i++)
