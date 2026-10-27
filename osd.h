@@ -28,6 +28,8 @@ void InfoEnable(int x, int y, int width, int height);
 void OsdDisable();
 void OsdMenuCtl(int en);
 void OsdUpdate();
+// Experimental only: call solely with matching FPGA menu.rbf; defaults off.
+void OsdExperimental240Enable(bool enable, bool mode224);
 void OSD_PrintInfo(const char *message, int *width, int *height, int frame = 0);
 void OsdDrawLogo(int row);
 void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx = 0, bool translate = true);
