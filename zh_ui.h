@@ -10,8 +10,9 @@ unsigned ZhTextWidth(const std::string &text);
 std::vector<std::string> ZhWrap(const std::string &text, unsigned width);
 
 struct ZhRow {
-    std::string source, text;
+    std::string source, text, right_label;
     unsigned pixel_width=0;
+    unsigned right_width=0;
     bool invert=false, stipple=false, raw=false;
     int mininv=0, maxinv=32;
     unsigned scroll=0;
@@ -29,7 +30,8 @@ struct ZhPage {
     void clear();
     void set(unsigned row, const char *text, bool invert, bool stipple,
              bool raw=false, int mininv=0, int maxinv=32, unsigned char arrow=0,
-             unsigned char vertical_shift=0, bool use_background=false);
+             unsigned char vertical_shift=0, bool use_background=false,
+             const char *right_label="");
     std::vector<int> visible(unsigned logical_rows);
     void page(int direction) { first += direction*6; if(first<0) first=0; manual=true; }
 };

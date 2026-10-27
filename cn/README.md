@@ -1,13 +1,14 @@
 # MiSTer FPGA 中文 OSD · ZLabs 固定字库集成（开发预览）
 
-本分支融合旧版 `chinese-osd-prototype` 的菜单中文化、滚动、选中视口和翻译资源与固定的 ZLabs RoundPix 16px 字库。当前约 602 条菜单翻译（以 localization/zh_CN.tsv 为准），不依赖 Oldman。
+本分支融合旧版 `chinese-osd-prototype` 的菜单中文化、滚动、选中视口和翻译资源与固定的 ZLabs RoundPix 12px 字库。当前约 602 条菜单翻译（以 localization/zh_CN.tsv 为准），不依赖 Oldman。
 
 ## 字库（不会在 CI 重新生成）
 
-- **唯一运行时文件：** `cn/assets/misterfpga.cn`，314,376 字节，M16CN001。
-- SHA-256：`cb8afcf32aabfc566ee0e39cd282c5d5a2c20049f2252dd26258696481c1a517`。
+- **唯一运行时文件：** `cn/assets/misterfpga.cn`，531,856 字节，M16CN002，13,296 个字形。
+- SHA-256：`9e09784d39db7f37fad2d8f643a50330e39f2487c7b3b7a2937be84ceae3813c`。
 - 安装位置：MiSTer SD 卡根目录，对应 Linux 路径 `/media/fat/misterfpga.cn`。
-- 引擎由 `zh_font.cpp` 读取原生 16x16 (中)、8x16 (ASCII) 列式点阵，转换位序。字库缺失/不合法时回退英文界面。
+- 引擎由 `zh_font.cpp` 读取 12×16（中）及 6×16（ASCII）列式点阵，字形在 16 像素行内上下各留约 2 像素。字库缺失/不合法时回退英文界面。
+- 字库由 [ZLabs RoundPix 12px 的 Build_20260813 发布字体](https://github.com/Astro-2539/ZLabs-RoundPix-12px/releases/tag/Build_20260813)转换，原始 `ZLabsRoundPix_12px_M_CN.ttf` 的 SHA-256 为 `5adc3a83d11edc2e6f5bb3bc009dd9028dc055cbb3fc5f23715fb4de3c4e3eb0`。开发时可用 `cn/build_font12.py` 重现；CI 只校验并复制已提交的二进制。
 - 字型遵循 SIL OFL-1.1；生成的二进制随包带 `LICENSE-OFL`。除非明确升级字体，不会重新拉取或转换字库。
 
 ## 自动更新
@@ -19,6 +20,7 @@
 ## 菜单状态
 
 - 保留旧项目译词、普通/反白/图标/滚动、8 行菜单视口、标题侧栏等。
+- 中文文件浏览器按字库所含汉字的无声调拼音排序，仍保持上级目录和目录优先；英文界面沿用原排序。拼音表由 `pypinyin==0.55.0`（MIT）在开发时生成，运行时无额外依赖。多音字采用单字默认读音，暂不按词组判音；字库以外的字符按原 UTF-8 字节排序。
 - `MiSTer.ini` 的 `osd_language=1` 启用中文（当前分支默认）；`osd_language=0` 强制英文。
 - 物理 CRT、HDMI、不同菜单核心、加载时机仍未完成真机验收；这是开发预览，不要覆盖唯一一份可启动的 MiSTer 程序。
 

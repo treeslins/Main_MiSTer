@@ -271,12 +271,12 @@ static void draw_title(const unsigned char *p)
 }
 
 // write a null-terminated string <s> to the OSD buffer starting at line <n>
-void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv, bool translate)
+void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv, bool translate, const char *right_label)
 {
 	if(OsdChinese() && n<osd_size && n<32) {
 		if(zh_page.rows[n].source!=(s?s:"")) zh_scroll_times[n]=0;
 		zh_page.set(n,s,invert,stipple,!translate,mininv,maxinv,
-		            (unsigned char)leftchar, (unsigned char)((offset>=0 && offset<=7)?offset:0), usebg!=0);
+		            (unsigned char)leftchar, (unsigned char)((offset>=0 && offset<=7)?offset:0), usebg!=0,right_label);
 		zh_scroll_active[n]=false;
 		zh_dirty=true; zh_info=false;
 		return;
@@ -676,12 +676,12 @@ static void print_line(unsigned char line, const char *hdr, const char *text, un
 	}
 }
 
-void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx, bool translate)
+void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx, bool translate, const char *right_label)
 {
 	if(OsdChinese()) {
 		if((unsigned char)n<osd_size && (unsigned char)n<32 && str) {
 			if(zh_page.rows[(unsigned)n].source!=str) zh_scroll_times[(unsigned)n]=0;
-			zh_page.set((unsigned)n,str,invert,false,!translate);
+			zh_page.set((unsigned)n,str,invert,false,!translate,0,32,0,0,false,right_label);
 			zh_scroll_active[(unsigned)n]=true; zh_dirty=true;
 		}
 		return;
@@ -755,7 +755,9 @@ static void zh_compose()
 	for(unsigned i=0;i<(unsigned)osd_size && i<32;++i) {
 		auto &row=zh_page.rows[i];
 		unsigned width=row.pixel_width;
-		if((row.invert || zh_scroll_active[i]) && width>232) {
+		const unsigned suffix_width=std::min(row.right_width,234u);
+		const unsigned name_width=suffix_width?(suffix_width+8u<234u?234u-suffix_width-8u:0u):232u;
+		if((row.invert || zh_scroll_active[i]) && width>name_width) {
 			if(!zh_scroll_times[i]) zh_scroll_times[i]=GetTimer(1000);
 			else if(CheckTimer(zh_scroll_times[i])) {
 				row.scroll=(row.scroll+1)%(width+64);

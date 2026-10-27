@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Pinned ZLabs RoundPix 16px glyphs are separately licensed SIL OFL 1.1.
+// Pinned ZLabs RoundPix 12px glyphs are separately licensed SIL OFL 1.1.
 #include "zh_font.h"
 #include <cstdio>
 #include <cstdlib>
@@ -19,7 +19,8 @@ uint8_t reverse8(uint8_t b) {
     b = (uint8_t)(((b & 0xcc) >> 2) | ((b & 0x33) << 2));
     return (uint8_t)(((b & 0xaa) >> 1) | ((b & 0x55) << 1));
 }
-// M16CN001 records: Unicode LE32, width byte, reserved[3], 16 top bytes, 16 bottom bytes.
+// M16CN002 records: Unicode LE32, width byte, reserved[3], 16 top bytes, 16 bottom bytes.
+// The 12px face occupies rows 2-13 in a 16px OSD cell.
 // Pixel 0 is bit7 in the font but bit0 in the MiSTer OSD, hence reverse8.
 bool load_once() {
     if (attempted) return !data.empty();
@@ -39,7 +40,7 @@ bool load_once() {
     std::vector<uint8_t> temp(static_cast<size_t>(length));
     bool ok = std::fread(temp.data(), 1, temp.size(), file) == temp.size();
     std::fclose(file);
-    if (!ok || std::memcmp(temp.data(), "M16CN001", 8) ||
+    if (!ok || std::memcmp(temp.data(), "M16CN002", 8) ||
         le32(temp.data() + 8) != 1) return false;
     const uint32_t count = le32(temp.data() + 12);
     if (!count || (uint64_t)count * 40u + 16u != temp.size()) return false;
@@ -47,7 +48,7 @@ bool load_once() {
     for (uint32_t i = 0; i < count; ++i) {
         const uint8_t *row = temp.data() + 16 + static_cast<size_t>(i) * 40;
         uint32_t cp = le32(row);
-        if (cp <= previous || (row[4] != 8 && row[4] != 16) ||
+        if (cp <= previous || (row[4] != 6 && row[4] != 12) ||
             row[5] || row[6] || row[7]) return false;
         previous = cp;
     }

@@ -1331,6 +1331,62 @@ void FindStorage(void)
 	else if (ENOENT == errno) mkdir(full_path, S_IRWXU | S_IRWXG | S_IRWXO);
 }
 
+#include "cn/pinyin_sort_data.h"
+
+static const char *pinyin_for(uint32_t cp)
+{
+	size_t lo = 0, hi = sizeof(pinyin_entries) / sizeof(pinyin_entries[0]);
+	while (lo < hi)
+	{
+		size_t mid = lo + (hi - lo) / 2;
+		if (pinyin_entries[mid].codepoint < cp) lo = mid + 1;
+		else hi = mid;
+	}
+	return (lo < sizeof(pinyin_entries) / sizeof(pinyin_entries[0]) && pinyin_entries[lo].codepoint == cp)
+		? pinyin_syllables[pinyin_entries[lo].syllable] : NULL;
+}
+
+static std::string pinyin_sort_key(const char *name, size_t len)
+{
+	std::string key;
+	for (size_t i = 0; i < len;)
+	{
+		unsigned char c = (unsigned char)name[i];
+		if (c < 0x80)
+		{
+			key += (char)tolower(c);
+			++i;
+			continue;
+		}
+		uint32_t cp = 0;
+		size_t bytes = 0;
+		if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; bytes = 2; }
+		else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; bytes = 3; }
+		else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; bytes = 4; }
+		if (bytes && i + bytes <= len)
+		{
+			bool valid = true;
+			for (size_t j = 1; j < bytes; ++j)
+			{
+				unsigned char next = (unsigned char)name[i + j];
+				if ((next & 0xC0) != 0x80) { valid = false; break; }
+				cp = (cp << 6) | (next & 0x3F);
+			}
+			if (valid)
+			{
+				const char *reading = pinyin_for(cp);
+				if (reading) { key += reading; key += '\1'; }
+				else key.append(name + i, bytes);
+				i += bytes;
+				continue;
+			}
+		}
+		key += (char)c;
+		++i;
+	}
+	return key;
+}
+
 struct DirentComp
 {
 	bool operator()(const direntext_t& de1, const direntext_t& de2)
@@ -1343,8 +1399,10 @@ struct DirentComp
 		}
 #endif
 
-		if ((de1.de.d_type == DT_DIR) && !strcmp(de1.altname, "..")) return true;
-		if ((de2.de.d_type == DT_DIR) && !strcmp(de2.altname, "..")) return false;
+		bool parent1 = de1.de.d_type == DT_DIR && !strcmp(de1.altname, "..");
+		bool parent2 = de2.de.d_type == DT_DIR && !strcmp(de2.altname, "..");
+		if (parent1 != parent2) return parent1;
+		if (parent1) return false;
 
 		if ((de1.de.d_type == DT_DIR) && (de2.de.d_type != DT_DIR)) return true;
 		if ((de1.de.d_type != DT_DIR) && (de2.de.d_type == DT_DIR)) return false;
@@ -1355,7 +1413,15 @@ struct DirentComp
 		if ((len2 > 4) && (de2.altname[len2 - 4] == '.')) len2 -= 4;
 
 		int len = (len1 < len2) ? len1 : len2;
-		int ret = strncasecmp(de1.altname, de2.altname, len);
+		int ret = 0;
+		if (OsdChinese())
+		{
+			std::string key1 = pinyin_sort_key(de1.altname, len1);
+			std::string key2 = pinyin_sort_key(de2.altname, len2);
+			ret = key1.compare(key2);
+			if (ret) return ret < 0;
+		}
+		ret = strncasecmp(de1.altname, de2.altname, len);
 		if (!ret)
 		{
 			if(len1 != len2)

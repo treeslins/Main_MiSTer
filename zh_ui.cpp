@@ -7,6 +7,13 @@
 
 static bool word(unsigned char c) { return (c>='a' && c<='z') || (c>='A' && c<='Z') || (c>='0' && c<='9') || c=='_' || c=='.' || c=='/' || c=='\\'; }
 static unsigned char lower(unsigned char c) { return c>='A' && c<='Z' ? c+32 : c; }
+static std::string trim_layout_space(const std::string &s)
+{
+    const size_t first=s.find_first_not_of(" \t");
+    if(first==std::string::npos) return "";
+    const size_t last=s.find_last_not_of(" \t");
+    return s.substr(first,last-first+1);
+}
 
 std::string ZhTranslate(const std::string &source)
 {
@@ -115,7 +122,8 @@ void ZhPage::clear()
 
 void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
                  bool raw, int mininv, int maxinv, unsigned char arrow,
-                 unsigned char vertical_shift, bool use_background)
+                 unsigned char vertical_shift, bool use_background,
+                 const char *right_label)
 {
     if(row>=32) return;
     auto &r=rows[row];
@@ -123,7 +131,13 @@ void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
     if(incoming!=r.source || raw!=r.raw) {
         r.source=incoming; r.raw=raw;
         r.text=raw?ZhMixedText(incoming):ZhTranslate(incoming);
-        r.pixel_width=ZhTextWidth(r.text);
+        r.pixel_width=ZhTextWidth(raw?r.text:trim_layout_space(r.text));
+        r.scroll=0;
+    }
+    const std::string suffix=right_label?right_label:"";
+    if(suffix!=r.right_label) {
+        r.right_label=suffix;
+        r.right_width=ZhTextWidth(suffix);
         r.scroll=0;
     }
     r.invert=invert; r.stipple=stipple; r.mininv=mininv; r.maxinv=maxinv; r.arrow=arrow;
@@ -157,7 +171,7 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
 
     std::vector<int> candidates;
     // Keep native row geometry when it fits. For a 16-row legacy menu,
-    // 16px glyphs leave only seven body slots: remove separators only when
+    // 16px OSD rows leave only seven body slots: remove separators only when
     // required, so actual entries remain reachable by focus/page controls.
     if(last_used<=slots) {
         for(int i=0;i<body_end;++i) candidates.push_back(i);
@@ -214,14 +228,39 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 	for(unsigned physical=0;physical<visible.size();++physical) {
 		if(visible[physical]<0) continue;
 		auto &row=page.rows[visible[physical]];
-		uint8_t top[234],bottom[234];
-		std::string text=row.text;
+		uint8_t top[234]={},bottom[234]={};
+		// Legacy spaces align 8px English characters, not 12px Chinese glyphs.
+		std::string text=row.raw?row.text:trim_layout_space(row.text);
 		if(visible[physical]==(int)logical_rows-1 && !row.raw) {
 			if(arrows&1) text=u8"← "+text;
 			if(arrows&2) text+=u8" →";
 		}
-		if(row.scroll) text+="        "+row.text;
-		ZhRender(text.c_str(),top,bottom,234,false,row.stipple,row.scroll,icons,row.vertical_shift);
+		if(row.scroll) text+="        "+(row.raw?row.text:trim_layout_space(row.text));
+		const unsigned suffix_width=std::min(row.right_width,234u);
+		const unsigned gap=suffix_width?8u:0u;
+		const unsigned name_width=suffix_width+gap<234u?234u-suffix_width-gap:0u;
+		bool aligned_value=false;
+		if(!row.raw && !suffix_width && !row.scroll) {
+			const size_t ascii_colon=text.find(':');
+			const size_t wide_colon=text.find(u8"：");
+			const size_t colon=std::min(ascii_colon,wide_colon);
+			if(colon!=std::string::npos) {
+				const size_t colon_end=colon+(colon==wide_colon?strlen(u8"："):1);
+				const std::string label=trim_layout_space(text.substr(0,colon_end));
+				const std::string value=trim_layout_space(text.substr(colon_end));
+				const unsigned value_width=ZhTextWidth(value);
+				if(!value.empty() && value_width+8u+ZhTextWidth(label)<=name_width) {
+					ZhRender(label.c_str(),top,bottom,name_width,false,row.stipple,0,icons,row.vertical_shift);
+					ZhRender(value.c_str(),top+name_width-value_width,bottom+name_width-value_width,
+					         value_width,false,row.stipple,0,icons,row.vertical_shift);
+					aligned_value=true;
+				}
+			}
+		}
+		if(!aligned_value) ZhRender(text.c_str(),top,bottom,name_width,false,row.stipple,row.scroll,icons,row.vertical_shift);
+		if(suffix_width) ZhRender(row.right_label.c_str(),top+234-suffix_width,
+		                           bottom+234-suffix_width,suffix_width,false,row.stipple,
+		                           0,icons,row.vertical_shift);
 		for(unsigned x=0;x<234;++x) {
 			// Partial highlights are measured in old 8-pixel OSD cells.
 			bool inv=row.invert && (int)((x+22)/8)>=row.mininv && (int)((x+22)/8)<row.maxinv;
@@ -235,6 +274,12 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			frame[(physical*2)*256+22+x]=upper;
 			frame[(physical*2+1)*256+22+x]=lower;
 		}
+		// A skipped legacy blank row still marks a section boundary. Draw it
+		// in the free top margin instead of spending a whole 16px row on it.
+		if(physical && visible[physical-1]>=0 &&
+		   visible[physical]>visible[physical-1]+1 && !row.invert)
+			for(unsigned x=4;x<230;x+=3)
+				frame[(physical*2)*256+22+x]|=1;
 		// Preserve per-row up/down navigation markers supplied by the core menu.
 		if(row.arrow) for(unsigned x=0;x<8;++x) {
 			unsigned bits=0;

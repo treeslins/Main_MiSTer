@@ -7,9 +7,9 @@
 
 int main() {
     uint8_t normal_top[16], normal_bottom[16], shifted_top[16], shifted_bottom[16];
-    assert(ZhRender(u8"中", normal_top, normal_bottom, 16) == 16);
+    assert(ZhRender(u8"中", normal_top, normal_bottom, 16) == 12);
     assert(ZhRender(u8"中", shifted_top, shifted_bottom, 16,
-                    false, false, 0, nullptr, 1) == 16);
+                    false, false, 0, nullptr, 1) == 12);
     for (int x=0; x<16; ++x) {
         const uint16_t original=(uint16_t)normal_top[x] | ((uint16_t)normal_bottom[x]<<8);
         const uint16_t shifted=(uint16_t)shifted_top[x] | ((uint16_t)shifted_bottom[x]<<8);
@@ -19,7 +19,7 @@ int main() {
     // at the top are inverse-white, rather than shifted to black.
     uint8_t inverted_top[16], inverted_bottom[16];
     assert(ZhRender(u8"中", inverted_top, inverted_bottom, 16,
-                    true, false, 0, nullptr, 1)==16);
+                    true, false, 0, nullptr, 1)==12);
     for (int x=0; x<16; ++x) {
         assert((uint8_t)(inverted_top[x]^shifted_top[x])==0xff);
         assert((uint8_t)(inverted_bottom[x]^shifted_bottom[x])==0xff);

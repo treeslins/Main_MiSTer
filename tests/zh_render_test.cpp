@@ -6,16 +6,16 @@
 #include <vector>
 int main(int argc, char **argv) {
     uint8_t a[234],b[234],c[234],d[234];
-    assert(ZhRender(u8"中文",a,b,234)==32);
+    assert(ZhRender(u8"中文",a,b,234)==24);
     ZhRender(u8"中文",c,d,234,true);
     for (unsigned i=0;i<234;++i) { assert((a[i]^c[i])==255); assert((b[i]^d[i])==255); }
-    assert(ZhRender(u8"中",a,b,15)==0);
-    assert(ZhRender(u8"中",a,b,16)==16);
-    assert(ZhRender(u8"中\U0001f680",a,b,234)==32); // Unknown supplementary glyph: visible fallback box
-    assert(a[16]==255 && b[16]==255);
+    assert(ZhRender(u8"中",a,b,11)==0);
+    assert(ZhRender(u8"中",a,b,12)==12);
+    assert(ZhRender(u8"中\U0010ffff",a,b,234)==28); // Unknown glyph: visible fallback box
+    assert(a[12]==255 && b[12]==255);
     ZhRender(u8"中文",a,b,234);
     ZhRender(u8"中文",c,d,234,false,false,3);
-    for(unsigned i=0;i<29;++i) { assert(c[i]==a[i+3]); assert(d[i]==b[i+3]); }
+    for(unsigned i=0;i<21;++i) { assert(c[i]==a[i+3]); assert(d[i]==b[i+3]); }
     for(const char *input : {"\xe4", "\xe4\xb8", "\xc0\xaf", "\xed\xa0\x80", "\xf4\x90\x80\x80"}) {
         const char *p=input; assert(ZhDecode(p)==0xfffd);
     }
@@ -28,9 +28,27 @@ int main(int argc, char **argv) {
     assert(ZhTranslate("Offset: 20")==u8"偏移: 20");
     assert(ZhTranslate("ControllerX")=="ControllerX");
     assert(ZhMixedText(u8"Save 中文.rom")==u8"Save 中文.rom");
-    assert(ZhTextWidth(u8"中文AB")==48);
-    auto wrapped=ZhWrap(u8"中文中文",32);
+    assert(ZhTextWidth(u8"中文AB")==36);
+    auto wrapped=ZhWrap(u8"中文中文",24);
     assert(wrapped.size()==2 && wrapped[0]==u8"中文" && wrapped[1]==u8"中文");
+    // English padding must not shift Chinese options; values share a right edge.
+    ZhPage columns;
+    columns.set(0,"   Core Volume:       Off",false,false);
+    uint8_t column_frame[16*256];
+    unsigned char column_icons[256][8]={};
+    ZhDrawPage(columns,"",8,0,column_frame,column_icons);
+    uint8_t value_top[24],value_bottom[24];
+    assert(ZhRender(u8"关闭",value_top,value_bottom,24)==24);
+    for(unsigned x=0;x<24;++x) {
+        assert(column_frame[22+234-24+x]==value_top[x]);
+        assert(column_frame[256+22+234-24+x]==value_bottom[x]);
+    }
+    // Collapsed blank rows still leave a visible section marker.
+    ZhPage sections;
+    sections.set(0,"First",false,false);
+    for(unsigned i=2;i<=8;++i) sections.set(i,"Next",false,false);
+    ZhDrawPage(sections,"",16,0,column_frame,column_icons);
+    assert((column_frame[2*256+22+4]&1)!=0);
     for(unsigned size=8;size<=18;++size) {
         ZhPage page;
         for(unsigned i=0;i<size-1;++i) page.set(i,"Menu",false,false);

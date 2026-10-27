@@ -148,10 +148,10 @@ Same as Vert	同垂直滤波
 Intl filter	隔行滤波
 Gamma correction	伽马校正
 On	开启
-Shadow Mask	荫罩
+Shadow Mask	遮罩
 Reset to Defaults	恢复默认设置
 Help requires	帮助功能需要
-Reset to apply	重启后生效
+Reset to apply	重置核心以应用
 Connection	连接
 Link	链路
 USB Serial	USB 串口
@@ -246,11 +246,11 @@ LCD-On(non-FB)	LCD常亮（无帧缓冲）
 LCD-Auto(non-FB)	LCD自动（无帧缓冲）
 Default Config	默认配置
 Synth	合成器
-Munt ROM	Munt 固件
+Munt ROM	Munt 音源 ROM
 Unknown	未知
 SoundFont	音色库
 Current Config	当前配置
-Reset Hanging Notes	清除挂起音符
+Reset Hanging Notes	停止卡住的音符
 Cores	核心列表
 active	已启用
 Clearing the option	正在清除选项
@@ -347,7 +347,7 @@ in order to use it again.	请确认后再继续。
 Do you want to continue?	是否继续？
 Yes, and don't ask again	是，不再询问
 BT Pairing	蓝牙配对
-No Bluetooth available	没有可用的蓝牙设备
+No Bluetooth available	蓝牙适配器不可用
 Finish	完成
 OK	确认
 Delete all pairings...	删除全部配对…
@@ -488,9 +488,9 @@ Free Play	免费游玩
 Coinage	投币设置
 Continue	继续
 Service Mode	维修模式
-Service	维修
+Service	服务
 Test Mode	测试模式
-Cabinet	机柜
+Cabinet	街机机台
 Upright	直立式
 Cocktail	桌式
 Flip Screen	翻转画面
@@ -529,7 +529,7 @@ Eject Disk	弹出磁盘
 Eject	弹出
 Save State	保存状态
 Load State	加载状态
-Save RAM	保存存档内存
+Save RAM	存档 RAM
 Autosave	自动保存
 Save Settings	保存设置
 Reset Settings	重置设置

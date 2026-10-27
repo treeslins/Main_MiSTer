@@ -8351,9 +8351,15 @@ static std::string chinese_file_label(int index)
 	if(item->de.d_type==DT_DIR && !strcmp(name,"..")) return u8"上级目录";
 	if(item->de.d_type==DT_DIR && (fs_Options & SCANO_CORES) && name[0]=='_') ++name;
 	std::string label=name;
-	if(item->de.d_type==DT_DIR) label=std::string(item->flags & DT_EXT_ZIP?"[ZIP] ":u8"[目录] ")+label;
-	else if(!cfg.rbf_hide_datecode && item->datecode[0]) label+=" "+std::string(item->datecode);
+	if(item->de.d_type!=DT_DIR && !cfg.rbf_hide_datecode && item->datecode[0]) label+=" "+std::string(item->datecode);
 	return label;
+}
+
+static const char *chinese_file_right_label(int index)
+{
+	auto item=flist_DirItem(index);
+	if(item->de.d_type!=DT_DIR || !strcmp(item->altname,"..")) return "";
+	return item->flags & DT_EXT_ZIP?"[ZIP]":u8"[目录]";
 }
 
 void ScrollLongName(void)
@@ -8361,7 +8367,8 @@ void ScrollLongName(void)
 	if(OsdChinese()) {
 		if(flist_nDirEntries()) {
 			std::string label=chinese_file_label(flist_iSelectedEntry());
-			ScrollText(flist_iSelectedEntry()-flist_iFirstEntry(),label.c_str(),0,0,0,1,0,false);
+			ScrollText(flist_iSelectedEntry()-flist_iFirstEntry(),label.c_str(),0,0,0,1,0,false,
+			           chinese_file_right_label(flist_iSelectedEntry()));
 		}
 		return;
 	}
@@ -8407,15 +8414,19 @@ void PrintDirectory(int expand)
 		for(int i=0;i<OsdGetSize();++i) {
 			int k=flist_iFirstEntry()+i;
 			std::string label;
+			const char *right_label="";
 			bool raw=true;
-			if(k<flist_nDirEntries()) label=chinese_file_label(k);
+			if(k<flist_nDirEntries()) {
+				label=chinese_file_label(k);
+				right_label=chinese_file_right_label(k);
+			}
 			else if(!flist_nDirEntries() && i==0) { label="No files!"; raw=false; }
 			else if(!flist_nDirEntries() && home_dir && !filter[0]) {
 				if(i==1) { label="Missing directory:"; raw=false; }
 				if(i==2) label=home_dir;
 			}
 			char marker=(!i && k)?17:(i==OsdGetSize()-1 && k+1<flist_nDirEntries())?16:0;
-			OsdWriteOffset(i,label.c_str(),k==flist_iSelectedEntry() && k<flist_nDirEntries(),0,0,marker,0,32,0,!raw);
+			OsdWriteOffset(i,label.c_str(),k==flist_iSelectedEntry() && k<flist_nDirEntries(),0,0,marker,0,32,0,!raw,right_label);
 		}
 		return;
 	}
