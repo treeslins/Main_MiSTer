@@ -4,10 +4,10 @@
 
 ## 字库（不会在 CI 重新生成）
 
-- **唯一运行时文件：** `cn/assets/misterfpga.cn`，531,856 字节，M16CN003，13,296 个字形。
-- SHA-256：`4d3681b49aa2bcded85ca22b3b04ea12434a32280145e71c5761731433ef2e64`。
+- **唯一运行时文件：** `cn/assets/misterfpga.cn`，531,856 字节，M16CN004，13,296 个字形。
+- SHA-256：`0f2857e3f2c559db4efdad381a0eb8384aa05810971ba9ab963535aa548b4ec9`。
 - 安装位置：MiSTer SD 卡根目录，对应 Linux 路径 `/media/fat/misterfpga.cn`。
-- 引擎由 `zh_font.cpp` 读取 12×16（中）及 6×16（ASCII）列式点阵。中文在 16 像素行内居中，英文、数字和符号按共同基线与中文底部对齐。字库缺失/不合法时回退英文界面。
+- 引擎由 `zh_font.cpp` 读取 12×16（中）及 6×16（ASCII）列式点阵。中文在 16 像素行内居中，英文、数字及短全角标点按基线与中文底部对齐。字库缺失/不合法时回退英文界面。
 - 字库由 [ZLabs RoundPix 12px 的 Build_20260813 发布字体](https://github.com/Astro-2539/ZLabs-RoundPix-12px/releases/tag/Build_20260813)转换，原始 `ZLabsRoundPix_12px_M_CN.ttf` 的 SHA-256 为 `5adc3a83d11edc2e6f5bb3bc009dd9028dc055cbb3fc5f23715fb4de3c4e3eb0`。开发时可用 `cn/build_font12.py` 重现；CI 只校验并复制已提交的二进制。
 - 字型遵循 SIL OFL-1.1；生成的二进制随包带 `LICENSE-OFL`。除非明确升级字体，不会重新拉取或转换字库。
 

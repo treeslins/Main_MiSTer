@@ -8,7 +8,7 @@ int main() {
     assert(ZhFontReady());
     const ZhGlyph *zh = ZhFindGlyph(0x4E2D); // 中
     assert(zh && zh->width == 12);
-    // M16CN003 has MSB-first column bytes; FPGA OSD consumes LSB-first.
+    // M16CN004 has MSB-first column bytes; FPGA OSD consumes LSB-first.
     assert(zh->columns[0] == 0x01E0);
     assert(zh->columns[5] == 0x1FFC);
     assert((zh->columns[5] & 0xC003) == 0); // Two blank rows above and below.
@@ -26,8 +26,9 @@ int main() {
     assert(bottom('a') == bottom(0x4E2D));
     assert(bottom('0') == bottom(0x4E2D));
     assert(bottom('.') == bottom(0x4E2D));
+    assert(bottom(0xFF1A) == bottom(0x4E2D)); // Fullwidth colon after 存储.
     assert(bottom('g') == bottom(0x4E2D) + 1); // Descender retains its extra pixel.
     const ZhGlyph *missing = ZhFindGlyph(0x10FFFF);
     assert(!missing);
-    puts("Pinned M16CN003: lookup, 6/12 width, mixed-script baseline PASS");
+    puts("Pinned M16CN004: lookup, 6/12 width, mixed-script baseline PASS");
 }

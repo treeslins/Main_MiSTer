@@ -6,7 +6,7 @@ import hashlib
 import json
 import struct
 
-EXPECTED_SHA256 = "4d3681b49aa2bcded85ca22b3b04ea12434a32280145e71c5761731433ef2e64"
+EXPECTED_SHA256 = "0f2857e3f2c559db4efdad381a0eb8384aa05810971ba9ab963535aa548b4ec9"
 EXPECTED_SIZE = 531856
 EXPECTED_COUNT = 13296
 
@@ -15,8 +15,8 @@ def verify(path: Path):
     digest = hashlib.sha256(data).hexdigest()
     if len(data) != EXPECTED_SIZE or digest != EXPECTED_SHA256:
         raise ValueError(f"PINNED FONT MISMATCH: expected {EXPECTED_SHA256}, got {digest} ({len(data)} bytes)")
-    if len(data) < 16 or data[:8] != b"M16CN003":
-        raise ValueError("bad M16CN003 font header")
+    if len(data) < 16 or data[:8] != b"M16CN004":
+        raise ValueError("bad M16CN004 font header")
     version, count = struct.unpack_from("<II", data, 8)
     if version != 1 or count != EXPECTED_COUNT or 16 + count * 40 != len(data):
         raise ValueError("unexpected Unicode table layout")
@@ -41,7 +41,7 @@ def verify(path: Path):
     if ascii_count != 95 or gb_count != 6763:
         raise ValueError(f"font coverage changed: ASCII {ascii_count}, GB2312 {gb_count}")
     return {
-        "format": "M16CN003", "source": "pinned-static-file",
+        "format": "M16CN004", "source": "pinned-static-file",
         "sha256": digest, "file_size": len(data), "glyph_count": count,
         "ascii_printable_count": ascii_count, "gb2312_hanzi_count": gb_count,
     }
