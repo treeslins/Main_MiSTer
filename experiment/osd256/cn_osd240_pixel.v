@@ -7,6 +7,7 @@ module cn_osd240_pixel (
     input wire reset,
     input wire [7:0] x,
     input wire [7:0] y,
+    input wire mode_224p,
     input wire [7:0] ram_data,
     output wire ram_header,
     output wire [4:0] ram_row,
@@ -15,7 +16,10 @@ module cn_osd240_pixel (
     output reg active
 );
     wire is_header = (y < 8'd24);
-    wire is_body = (y >= 8'd24 && y < 8'd232);
+    // 224p mode: 24px header + 192px body + 8px margin.
+    // 240p mode: 24px header + 208px body + 8px margin.
+    wire [7:0] body_end = mode_224p ? 8'd216 : 8'd232;
+    wire is_body = (y >= 8'd24 && y < body_end);
     wire [7:0] body_y = y - 8'd24;
     wire [7:0] logical_y = is_header ? y : body_y;
     assign ram_header = is_header;
