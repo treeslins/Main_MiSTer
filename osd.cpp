@@ -42,6 +42,7 @@ as rotated copies of the first 128 entries.  -- AMR
 #include "zh_render.h"
 #include "zh_ui.h"
 #include "cn/osd_rows.h"
+#include "cn/osd240_spi.h"
 #include "cfg.h"
 #include "spi.h"
 
@@ -772,6 +773,29 @@ static void zh_compose()
 	zh_dirty=false;
 }
 
+// Experimental 240p ARM transport. Never enabled automatically: legacy
+// menu.rbf does not understand F0-F4, and there is no feature handshake yet.
+// Use only with a matching experimental FPGA bitstream.
+static bool osd240_explicitly_enabled=false;
+static void cn240_begin(uint8_t command) { spi_osd_cmd_cont(command); }
+static void cn240_byte(uint8_t value) { spi_b(value); }
+static void cn240_end() { DisableOsd(); }
+static const cn_osd240::Sender cn240_sender={cn240_begin, cn240_byte, cn240_end};
+
+void OsdExperimental240Enable(bool enable, bool mode224)
+{
+    if(enable && !osd240_explicitly_enabled) {
+        cn_osd240::send_enable(cn240_sender);
+        cn_osd240::send_mode(cn240_sender, mode224);
+        osd240_explicitly_enabled=true;
+    } else if(enable) {
+        cn_osd240::send_mode(cn240_sender, mode224);
+    } else if(osd240_explicitly_enabled) {
+        cn_osd240::send_disable(cn240_sender);
+        osd240_explicitly_enabled=false;
+    }
+}
+
 void OsdUpdate()
 {
 	PROFILE_FUNCTION();
@@ -788,6 +812,17 @@ void OsdUpdate()
 			spi_osd_cmd_cont(OSD_CMD_WRITE | i);
 			spi_write(osdbuf + i * 256, 256, 0);
 			DisableOsd();
+            // Compatibility-only mirror: existing 16 physical rows and
+            // three original status rows. This does NOT create extra menu
+            // rows; the 224p/240p 12/13-row renderer remains future work.
+            if(osd240_explicitly_enabled && OsdChinese() && is_menu()) {
+                if(i>=0 && i<16)
+                    cn_osd240::send_row(cn240_sender, cn_osd240::Bank::Body,
+                                        (uint8_t)i, osdbuf+i*256, 256);
+                else if(i>=16 && i<19)
+                    cn_osd240::send_row(cn240_sender, cn_osd240::Bank::Header,
+                                        (uint8_t)(i-16), osdbuf+i*256, 256);
+            }
 			if (is_megacd()) mcd_poll();
 			if (is_pce()) pcecd_poll();
 			if (is_saturn()) saturn_poll();
