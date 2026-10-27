@@ -102,6 +102,12 @@ jobs:
           g++ -std=c++17 -Wall -Wextra -Werror -o /tmp/cn-osd240/test_arm_spi \
             experiment/osd256/test_arm_spi.cpp
           /tmp/cn-osd240/test_arm_spi
+      - name: Simulate independent extended 240p vertical scan
+        run: |
+          iverilog -g2012 -Wall -s tb_vscan -o /tmp/cn-osd240/vscan.vvp \
+            experiment/osd256/cn_osd240_vscan.v \
+            experiment/osd256/tb_cn_osd240_vscan.v
+          vvp /tmp/cn-osd240/vscan.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
