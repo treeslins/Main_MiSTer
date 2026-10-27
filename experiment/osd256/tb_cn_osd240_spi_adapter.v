@@ -2,11 +2,11 @@
 module tb_spi_adapter;
 reg clk=0,reset=1,sel=0,strobe=0;
 reg [15:0] din=0;
-wire enabled,we,header,legacy;
+wire enabled,we,header,legacy,mode_224p;
 wire [4:0] row;
 wire [7:0] col,data;
 cn_osd240_spi_adapter dut(.clk(clk),.reset(reset),.io_osd(sel),
- .io_strobe(strobe),.io_din(din),.enabled(enabled),
+ .io_strobe(strobe),.io_din(din),.enabled(enabled),.mode_224p(mode_224p),
  .ext_write(we),.ext_header(header),.ext_row(row),
  .ext_col(col),.ext_data(data),.legacy_passthrough(legacy));
 always #5 clk=~clk;
@@ -35,6 +35,12 @@ initial begin
  start_packet(8'hF0);byte_in(8'h43);byte_in(8'h4E);
  byte_in(8'h32);byte_in(8'h34);end_packet();
  if(enabled!==1) $fatal(1,"valid handshake rejected");
+ start_packet(8'hF4);byte_in(8'h01);end_packet();
+ if(mode_224p!==1) $fatal(1,"224p mode select failed");
+ start_packet(8'hF4);byte_in(8'h02);end_packet();
+ if(mode_224p!==1) $fatal(1,"invalid mode changed selection");
+ start_packet(8'hF4);byte_in(8'h00);end_packet();
+ if(mode_224p!==0) $fatal(1,"240p mode select failed");
  start_packet(8'hF2);byte_in(25);
  byte_in(8'h80);
  #1;
