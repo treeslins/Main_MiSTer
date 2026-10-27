@@ -12,7 +12,8 @@ from pathlib import Path
 import sys
 src=Path(sys.argv[1]).read_text()
 assert ".clk(clk_sys), .reset(1'b0)" in src, "SPI mode wrongly tied to OSD enable"
-assert ".x(osd_hcnt[7:0]), .y(cn240_scan_y)" in src
+assert ".x(cn240_scan_x), .y(cn240_scan_y)" in src
+assert "if(ce_pix) cn240_scan_x <= osd_hcnt[7:0];" in src
 assert "cn_osd240_vscan cn240_vscan" in src
 assert "cn_osd240_dualclock_ram cn240_bank" in src
 assert "cn_osd240_frame_mode cn240_frame_latch" in src
