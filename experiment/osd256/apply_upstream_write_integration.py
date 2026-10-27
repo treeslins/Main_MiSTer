@@ -26,7 +26,7 @@ wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
 // Explicit experimental video-height request, clocked by the SPI domain.
 // It is not automatic video-mode detection. Default 240p on power-up.
-reg cn240_mode_224p_sys=0;
+wire cn240_mode_224p_sys;
 (* ASYNC_REG="TRUE" *) reg cn240_mode_224p_meta=0;
 (* ASYNC_REG="TRUE" *) reg cn240_mode_224p_video=0;
 always @(posedge clk_video) begin
@@ -55,7 +55,8 @@ cn_osd240_pixel cn240_reader (
 cn_osd240_spi_adapter cn240_spi (
  .clk(clk_sys), .reset(1'b0),
  .io_osd(io_osd), .io_strobe(io_strobe), .io_din(io_din),
- .enabled(cn240_enabled), .ext_write(cn240_write),
+ .enabled(cn240_enabled), .mode_224p(cn240_mode_224p_sys),
+ .ext_write(cn240_write),
  .ext_header(cn240_header), .ext_row(cn240_row),
  .ext_col(cn240_col), .ext_data(cn240_data),
  .legacy_passthrough()
