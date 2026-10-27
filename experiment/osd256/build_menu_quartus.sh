@@ -13,7 +13,7 @@ command -v quartus_cpf >/dev/null || { echo "ERROR: quartus_cpf missing" >&2; ex
 # A future upstream-integrated patch must provide an unequivocal marker AND
 # actual references to its implementation. Fail closed until implemented.
 grep -q 'CN_OSD240_INTEGRATED' "$SRC/sys/osd.v" || {
-  echo "BLOCKED: sys/osd.v does not integrate CN_OSD240_INTEGRATED" >&2
+  echo "BLOCKED: 240p video scanning and safe output integration are still incomplete." >&2
   echo "Refusing to compile an ordinary upstream menu.rbf as extended 240p." >&2
   exit 4
 }
