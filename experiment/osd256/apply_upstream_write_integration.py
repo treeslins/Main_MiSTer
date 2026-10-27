@@ -24,6 +24,15 @@ wire cn240_video_header;
 wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
+// Explicit experimental video-height request, clocked by the SPI domain.
+// It is not automatic video-mode detection. Default 240p on power-up.
+reg cn240_mode_224p_sys=0;
+(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_meta=0;
+(* ASYNC_REG="TRUE" *) reg cn240_mode_224p_video=0;
+always @(posedge clk_video) begin
+ cn240_mode_224p_meta <= cn240_mode_224p_sys;
+ cn240_mode_224p_video <= cn240_mode_224p_meta;
+end
 // Synchronize the static mode request into the video domain. This is NOT
 // sufficient for synchronizing framebuffer writes or frame-atomic switching.
 (* ASYNC_REG="TRUE" *) reg cn240_enabled_meta=0;
@@ -38,7 +47,7 @@ wire cn240_preview_pixel = cn240_enabled_video &&
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
- .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .mode_224p(1'b0), .ram_data(cn240_video_read),
+ .x(osd_hcnt[7:0]), .y(osd_vcnt[7:0]), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
  .ram_header(cn240_video_header), .ram_row(cn240_video_row),
  .ram_column(cn240_video_col), .pixel(cn240_video_pixel),
  .active(cn240_video_active)
@@ -87,6 +96,10 @@ text=text.replace(mux_anchor, """\t// The existing legacy output remains the def
 end_anchor="\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"
 assert text.count(end_anchor)==1
 text=text.replace(end_anchor,end_anchor+"\n\t`endif",1)
+# Add the mode command as a separate selected SPI transaction (F4,
+# one payload byte: 0 = 240p, 1 = 224p). The adapter exports its mode
+# register; this wire assignment connects it to the two-stage synchronizer.
+# The selected mode is still experimental and not read back by ARM.
 p.write_text(text)
 q=root/"sys/sys.qip"
 q.write_text(q.read_text()+
