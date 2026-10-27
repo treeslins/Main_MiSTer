@@ -64,6 +64,9 @@ inline unsigned ZhRender(const char *text, uint8_t *top, uint8_t *bottom,
                     if(cp==0xe016) bits>>=1;
                 }
             }
+            // The font places navigation arrows near the top of a 16px row.
+            // Center them beside the Chinese exit label.
+            if(cp==0x2190 || cp==0x2192) bits=(uint16_t)(bits<<5);
             // Match the legacy per-column << offset operation, before inversion.
             if (vertical_shift) bits=(uint16_t)(bits << (vertical_shift>7?7:vertical_shift));
             if (stipple!=toggle_stipple) bits &= (x&1)?0xaaaa:0x5555;

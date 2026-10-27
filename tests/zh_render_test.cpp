@@ -61,6 +61,18 @@ int main(int argc, char **argv) {
         for(unsigned i=0;i<7;++i) assert(shown[i]==(int)i);
         assert(shown[7]==15);
     }
+    // Selecting the pinned Exit keeps the end of a long menu above it.
+    ZhPage exit_page;
+    for(unsigned i=0;i<15;++i) exit_page.set(i,"Option",false,false);
+    exit_page.set(15,"exit",true,false);
+    auto exit_rows=exit_page.visible(16);
+    assert(exit_rows.size()==8 && exit_rows[0]==8 && exit_rows[6]==14 && exit_rows[7]==15);
+    // A short menu must not jump into its unused blank rows.
+    ZhPage short_exit_page;
+    for(unsigned i=0;i<4;++i) short_exit_page.set(i,"Option",false,false);
+    short_exit_page.set(15,"exit",true,false);
+    auto short_exit_rows=short_exit_page.visible(16);
+    assert(short_exit_rows.size()==8 && short_exit_rows[0]==0 && short_exit_rows[3]==3 && short_exit_rows[7]==15);
     for(unsigned size=8;size<=18;++size) {
         ZhPage page;
         for(unsigned i=0;i<size-1;++i) page.set(i,"Menu",false,false);

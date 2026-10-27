@@ -739,6 +739,21 @@ static void infowrite(int pos, const char* txt)
 	OsdWrite(pos, str, 0, 0);
 }
 
+static void printChineseVideoInfo(int row, const char *label, const char *description)
+{
+	char resolution[16], frequency[16], refresh[16], line[64];
+	if (sscanf(description, "%15s %15s %15s", resolution, frequency, refresh) == 3)
+	{
+		// Five Hanzi plus ':' occupy 66px. These fixed ASCII fields fill
+		// the remaining 168px and right-align each value in its own column.
+		snprintf(line, sizeof(line), "%s%10.10s%10.10s%8.8s", label, resolution, frequency, refresh);
+	}
+	else snprintf(line, sizeof(line), "%s%s", label, description);
+	// Preserve the padding of the three fixed-width columns. Translation
+	// normally folds repeated spaces before drawing a menu row.
+	OsdWriteOffset(row, line, 0, 0, 0, 0, 0, 32, 0, false);
+}
+
 static void printSysInfo()
 {
 	if (!sysinfo_timer || CheckTimer(sysinfo_timer))
@@ -756,27 +771,21 @@ static void printSysInfo()
 			// Keep status in rows 0-3 and controls in rows 4-6, without the
 			// legacy 8px box drawing characters or hidden scroll pages.
 			char line[64];
-			char *ethernet = getNet(1);
-			if (ethernet) {
-				snprintf(line, sizeof(line), "\x1c %s", ethernet);
-				OsdWrite(0, line);
-			}
-			char *wifi = getNet(2);
-			if (wifi) {
-				snprintf(line, sizeof(line), "\x1d %s", wifi);
-				OsdWrite(ethernet ? 1 : 0, line);
-			}
-			if (!ethernet && !wifi) OsdWrite(0, "No network");
-			if (!ethernet || !wifi) OsdWrite(1);
+			const char *ethernet = getNet(1);
+			snprintf(line, sizeof(line), "有线连接IP: %s", ethernet ? ethernet + 4 : "未连接");
+			OsdWrite(0, line);
+			const char *wifi = getNet(2);
+			snprintf(line, sizeof(line), "无线连接IP: %s", wifi ? wifi + 4 : "未连接");
+			OsdWrite(1, line);
 
 			flip = (flip + 1) & 3;
 			if (hasbat && (flip & 2))
 			{
-				if (bat.capacity >= 0) snprintf(line, sizeof(line), "电量：%d%%", bat.capacity);
-				else snprintf(line, sizeof(line), "电量：n/a");
+				if (bat.capacity >= 0) snprintf(line, sizeof(line), "电量:%d%%", bat.capacity);
+				else snprintf(line, sizeof(line), "电量:n/a");
 				OsdWrite(2, line);
-				if (bat.load_current > 0) snprintf(line, sizeof(line), "充电：%dmA", bat.load_current);
-				else if (bat.load_current < -1) snprintf(line, sizeof(line), "放电：%dmA", -bat.load_current);
+				if (bat.load_current > 0) snprintf(line, sizeof(line), "充电:%dmA", bat.load_current);
+				else if (bat.load_current < -1) snprintf(line, sizeof(line), "放电:%dmA", -bat.load_current);
 				else snprintf(line, sizeof(line), "Not charging");
 				OsdWrite(3, line);
 			}
@@ -784,9 +793,9 @@ static void printSysInfo()
 			{
 				video_mode_adjust(true);
 				video_core_description(str, sizeof(str));
-				OsdWrite(2, str);
+				printChineseVideoInfo(2, "核心分辨率:", str);
 				video_scaler_description(str, sizeof(str));
-				OsdWrite(3, str);
+				printChineseVideoInfo(3, "菜单分辨率:", str);
 			}
 			return;
 		}
@@ -4108,7 +4117,7 @@ void HandleUI(void)
 		m = get_core_volume();
 		{
 			strcpy(s, "     Core Volume: ");
-			if (audio_filter_en() >= 0) s[4] = 0x1b;
+			if (!OsdChinese() && audio_filter_en() >= 0) s[4] = 0x1b;
 			memset(s + strlen(s), 0, 11);
 			char *bar = s + strlen(s);
 			memset(bar, 0x8C, 8);
@@ -4579,7 +4588,8 @@ void HandleUI(void)
 		while (m < 10) OsdDrawLogo(m++);
 		OsdWrite(m++, "     www.MiSTerFPGA.org", 0, 0, 1);
 		OsdWrite(m++, "", 0, 0, 1);
-		sprintf(s, "       MiSTer v%s", version + 5);
+		if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s", version + 5);
+		else sprintf(s, "       MiSTer v%s", version + 5);
 		OsdWrite(m++, s, 0, 0, 1);
 
 		s[0] = 0;
@@ -7369,13 +7379,17 @@ void HandleUI(void)
 		menumask = 0x7F;
 
 		OsdWrite(m++);
-		sprintf(s, "       MiSTer v%s", version + 5);
+		if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s", version + 5);
+		else sprintf(s, "       MiSTer v%s", version + 5);
 		{
 			char str[8] = {};
 			FILE *f = fopen("/MiSTer.version", "r");
 			if (f)
 			{
-				if (fread(str, 6, 1, f)) sprintf(s, " MiSTer v%s,  OS v%s", version + 5, str);
+				if (fread(str, 6, 1, f)) {
+					if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s, OS v%s", version + 5, str);
+					else sprintf(s, " MiSTer v%s,  OS v%s", version + 5, str);
+				}
 				fclose(f);
 			}
 		}
@@ -8451,7 +8465,8 @@ void PrintDirectory(int expand)
 {
 	if(OsdChinese()) {
 		ScrollReset();
-		for(int i=0;i<OsdGetSize();++i) {
+		const int visible_rows=OsdGetSize()<8?OsdGetSize():8;
+		for(int i=0;i<visible_rows;++i) {
 			int k=flist_iFirstEntry()+i;
 			std::string label;
 			const char *right_label="";
@@ -8465,7 +8480,7 @@ void PrintDirectory(int expand)
 				if(i==1) { label="Missing directory:"; raw=false; }
 				if(i==2) label=home_dir;
 			}
-			char marker=(!i && k)?17:(i==OsdGetSize()-1 && k+1<flist_nDirEntries())?16:0;
+			char marker=(!i && k)?17:(i==visible_rows-1 && k+1<flist_nDirEntries())?16:0;
 			OsdWriteOffset(i,label.c_str(),k==flist_iSelectedEntry() && k<flist_nDirEntries(),0,0,marker,0,32,0,!raw,right_label);
 		}
 		return;

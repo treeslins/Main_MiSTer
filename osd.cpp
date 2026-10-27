@@ -418,7 +418,7 @@ void OsdWriteText(const char *text, unsigned char code)
 {
 	zh_page.clear(); zh_info=false; zh_dirty=true;
 	std::string message=ZhTranslate(text?text:"");
-	if(code) message+=u8"\n代码："+std::to_string(code);
+	if(code) message+=u8"\n代码:"+std::to_string(code);
 	auto lines=ZhWrap(message,232);
 	for(unsigned i=0;i<lines.size() && i<8;++i) zh_page.set(i,lines[i].c_str(),false,false,true);
 }

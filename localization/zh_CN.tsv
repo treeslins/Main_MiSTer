@@ -38,16 +38,16 @@ Select	选择
 Start	开始
 KBD TOGGLE	切换键盘
 Menu	菜单
-Stick 1: Tilt RIGHT	摇杆1：向右推
-Stick 1: Tilt DOWN	摇杆1：向下推
-Mouse emu X: Tilt RIGHT	鼠标横轴：向右推
-Mouse emu Y: Tilt DOWN	鼠标纵轴：向下推
-DPAD test: Press RIGHT	方向键测试：按右
-DPAD test: Press DOWN	方向键测试：按下
-Stick 1 Test: Tilt RIGHT	摇杆1测试：向右推
-Stick 1 Test: Tilt DOWN	摇杆1测试：向下推
-Stick 2 Test: Tilt RIGHT	摇杆2测试：向右推
-Stick 2 Test: Tilt DOWN	摇杆2测试：向下推
+Stick 1: Tilt RIGHT	摇杆1:向右推
+Stick 1: Tilt DOWN	摇杆1:向下推
+Mouse emu X: Tilt RIGHT	鼠标横轴:向右推
+Mouse emu Y: Tilt DOWN	鼠标纵轴:向下推
+DPAD test: Press RIGHT	方向键测试:按右
+DPAD test: Press DOWN	方向键测试:按下
+Stick 1 Test: Tilt RIGHT	摇杆1测试:向右推
+Stick 1 Test: Tilt DOWN	摇杆1测试:向下推
+Stick 2 Test: Tilt RIGHT	摇杆2测试:向右推
+Stick 2 Test: Tilt DOWN	摇杆2测试:向下推
 Console	控制台
 Modem	调制解调器
 Local	本地
@@ -57,15 +57,15 @@ Custom	自定义
 2x Rotated	2倍旋转
 Normal	正常
 V-Integer	纵向整数缩放
-HV-Integer-	整数缩放（小）
-HV-Integer+	整数缩放（大）
+HV-Integer-	整数缩放(小)
+HV-Integer+	整数缩放(大)
 HV-Integer	横纵整数缩放
-Welcome to MiSTer! Use the cursor keys to navigate the menus. Use space bar or enter to select an item. Press Esc or F12 to exit the menus. Joystick emulation on the numeric keypad can be toggled with the numlock or scrlock key, while pressing Ctrl-Alt-0 (numeric keypad) toggles autofire mode.	欢迎使用 MiSTer！用方向键浏览，空格或回车选择，Esc 或 F12 退出。NumLock 或 ScrollLock 切换小键盘摇杆模拟；Ctrl+Alt+小键盘0 切换连发。
-Minimig can emulate an A600/A1200 IDE harddisk interface. The emulation can make use of Minimig-style hardfiles (complete disk images) or UAE-style hardfiles (filesystem images with no partition table).	Minimig 可模拟 A600/A1200 的 IDE 硬盘接口，支持 Minimig 完整磁盘镜像和 UAE 无分区表的文件系统镜像。
-Minimig's processor core can emulate a 68000 (cycle accuracy as A500/A600) or 68020 (maximum performance) processor with transparent cache.	Minimig 可模拟 68000（A500/A600 周期精确）或 68020（高性能）处理器，并提供透明缓存。
-Minimig can make use of up to 2 megabytes of Chip RAM, up to 1.5 megabytes of Slow RAM (A500 Trapdoor RAM), and up to 384 megabytes of Fast RAM (8MB max for 68000 mode). To use the HRTmon feature you will need a file on the SD card named hrtmon.rom.	Minimig 支持最多2MB芯片内存、1.5MB慢速内存及384MB快速内存（68000模式最多8MB）。使用 HRTmon 需要 SD 卡上的 hrtmon.rom 文件。
-Backspace key (or B-hold + A on gamepad) to unmount	按退格键，或手柄按住B再按A，卸载镜像。
-Backspace key (or B-hold + A on gamepad) to clear stored option. You have to reload the core to be able to use default value.	按退格键，或手柄按住B再按A，清除已存选项。重新加载核心后使用默认值。
+Welcome to MiSTer! Use the cursor keys to navigate the menus. Use space bar or enter to select an item. Press Esc or F12 to exit the menus. Joystick emulation on the numeric keypad can be toggled with the numlock or scrlock key, while pressing Ctrl-Alt-0 (numeric keypad) toggles autofire mode.	欢迎使用 MiSTer!用方向键浏览,空格或回车选择,Esc 或 F12 退出.NumLock 或 ScrollLock 切换小键盘摇杆模拟;Ctrl+Alt+小键盘0 切换连发.
+Minimig can emulate an A600/A1200 IDE harddisk interface. The emulation can make use of Minimig-style hardfiles (complete disk images) or UAE-style hardfiles (filesystem images with no partition table).	Minimig 可模拟 A600/A1200 的 IDE 硬盘接口,支持 Minimig 完整磁盘镜像和 UAE 无分区表的文件系统镜像.
+Minimig's processor core can emulate a 68000 (cycle accuracy as A500/A600) or 68020 (maximum performance) processor with transparent cache.	Minimig 可模拟 68000(A500/A600 周期精确)或 68020(高性能)处理器,并提供透明缓存.
+Minimig can make use of up to 2 megabytes of Chip RAM, up to 1.5 megabytes of Slow RAM (A500 Trapdoor RAM), and up to 384 megabytes of Fast RAM (8MB max for 68000 mode). To use the HRTmon feature you will need a file on the SD card named hrtmon.rom.	Minimig 支持最多2MB芯片内存,1.5MB慢速内存及384MB快速内存(68000模式最多8MB).使用 HRTmon 需要 SD 卡上的 hrtmon.rom 文件.
+Backspace key (or B-hold + A on gamepad) to unmount	按退格键,或手柄按住B再按A,卸载镜像.
+Backspace key (or B-hold + A on gamepad) to clear stored option. You have to reload the core to be able to use default value.	按退格键,或手柄按住B再按A,清除已存选项.重新加载核心后使用默认值.
 Scripts	脚本
 exit	退出
 back	返回
@@ -74,16 +74,16 @@ Ctrl+ESC to exit	Ctrl+Esc 退出
 No network	未连接网络
 ETA	剩余时间
 Not charging	未充电
-If you see this, then you	如果看到此提示，请
+If you see this, then you	如果看到此提示,请
 need to modify MiSTer.ini	修改 MiSTer.ini
 Either disable framebuffer	可关闭帧缓冲
 or enable scaler on VGA	或启用 VGA 缩放器
 Original	原始
 Full Screen	全屏
-A(Red/Fire)	A（红色／开火）
-B(Blue)	B（蓝色）
-C(Yellow)	C（黄色）
-D(Green)	D（绿色）
+A(Red/Fire)	A(红色/开火)
+B(Blue)	B(蓝色)
+C(Yellow)	C(黄色)
+D(Green)	D(绿色)
 Pause	暂停
 Select INI	选择配置文件
 Use dpad/cursor to select	用方向键选择
@@ -121,7 +121,7 @@ Manual	手册
 Cheats	金手指
 Saving...	正在保存…
 failed to load ROM	加载 ROM 失败
-Unsupported cartridge type!	不支持的卡带类型！
+Unsupported cartridge type!	不支持的卡带类型!
 Lock OSD	锁定菜单
 Define	设置
 buttons	按键
@@ -133,8 +133,8 @@ Reset settings	重置设置
 Save settings	保存设置
 Help	帮助
 About	关于
-Reboot (hold	重启（长按
-cold reboot)	冷启动）
+Reboot (hold	重启(长按
+cold reboot)	冷启动)
 Cold Reboot	冷启动
 Load preset	加载预设
 Horz filter	水平滤波
@@ -172,20 +172,20 @@ Enter Finish	回车完成
 Menu-hold Cancel	长按菜单键取消
 Clearing	正在清除
 Canceling	正在取消
-Space/User Skip	空格／用户键跳过
-(can use 2-button combo)	（可用双键组合）
+Space/User Skip	空格/用户键跳过
+(can use 2-button combo)	(可用双键组合)
 Press	请按
 You need to define this	请先在主菜单核心
 joystick in Menu core first	中设置此手柄
-Press ESC/Enter	按 Esc／回车
+Press ESC/Enter	按 Esc/回车
 Joystick	摇杆
 Keyboard	键盘
 User Undefine	用户键取消定义
-User/Space Undefine	用户键／空格取消定义
-User/Menu Undefine	用户键／菜单取消定义
+User/Space Undefine	用户键/空格取消定义
+User/Menu Undefine	用户键/菜单取消定义
 F12 Clear all	F12 清除全部
 Do you want to setup	是否设置
-alternative buttons?	备用按键？
+alternative buttons?	备用按键?
 Supported mapping	支持的映射
 Button(s)/Key(s) -> Key(s)	按键组合 → 键盘键
 Button(s) -> Button(s)	手柄键 → 手柄键
@@ -203,8 +203,8 @@ on the same pad	在同一手柄上操作
 or key(s) on a keyboard	或按键盘上的键
 Press button(s)	按手柄按键
 or key(s) to change	或键盘键进行修改
-Esc Clear, Enter Finish	Esc 清除，回车完成
-MiSTer by Alexey Melnikov, based on MiST by Till Harbaum, Minimig by Dennis van Weeren and other projects. MiSTer hardware and software is distributed under the terms of the GNU General Public License version 3. MiSTer FPGA cores are the work of their respective authors under individual licensing. Go to www.MiSTerFPGA.org for more details.	MiSTer 由 Alexey Melnikov 开发，基于 Till Harbaum 的 MiST、Dennis van Weeren 的 Minimig 等项目。MiSTer 软硬件采用 GNU GPL 第3版许可；各 FPGA 核心由其作者按各自许可发布。详情：www.MiSTerFPGA.org。
+Esc Clear, Enter Finish	Esc 清除,回车完成
+MiSTer by Alexey Melnikov, based on MiST by Till Harbaum, Minimig by Dennis van Weeren and other projects. MiSTer hardware and software is distributed under the terms of the GNU General Public License version 3. MiSTer FPGA cores are the work of their respective authors under individual licensing. Go to www.MiSTerFPGA.org for more details.	MiSTer 由 Alexey Melnikov 开发,基于 Till Harbaum 的 MiST,Dennis van Weeren 的 Minimig 等项目.MiSTer 软硬件采用 GNU GPL 第3版许可;各 FPGA 核心由其作者按各自许可发布.详情:www.MiSTerFPGA.org.
 Locked	已锁定
 Enter unlock code	输入解锁码
 Write protect	写保护
@@ -222,9 +222,9 @@ Aspect	画面比例
 Screen	屏幕
 Color	彩色
 Mono 60Hz	单色60Hz
-Screen: Mono	屏幕：单色
+Screen: Mono	屏幕:单色
 Video Crop	画面裁切
-Visible 216p(5x)	可视区216p（5倍）
+Visible 216p(5x)	可视区216p(5倍)
 Visible	可视区
 Full	完整
 Scanlines	扫描线
@@ -233,7 +233,7 @@ YM-Audio	YM 音频
 Startup config	启动配置
 Other configs	其他配置
 Drive Type	软驱类型
-Not Detected!	未检测到！
+Not Detected!	未检测到!
 Disk Image	磁盘镜像
 Physical Drive 2	实体软驱2
 Physical Drive 3	实体软驱3
@@ -242,8 +242,8 @@ add from main menu	从主菜单添加
 Select drive to toggle mode	选择软驱以切换模式
 Use MT32-pi	使用 MT32-pi
 Show Info	显示信息
-LCD-On(non-FB)	LCD常亮（无帧缓冲）
-LCD-Auto(non-FB)	LCD自动（无帧缓冲）
+LCD-On(non-FB)	LCD常亮(无帧缓冲)
+LCD-Auto(non-FB)	LCD自动(无帧缓冲)
 Default Config	默认配置
 Synth	合成器
 Munt ROM	Munt 音源 ROM
@@ -255,14 +255,14 @@ Cores	核心列表
 active	已启用
 Clearing the option	正在清除选项
 You have to reload the core	请重新加载核心
-to use default value.	以使用默认值。
+to use default value.	以使用默认值.
 Unmounting the image	正在卸载镜像
 Recent Cores	最近使用的核心
 Recent Files	最近使用的文件
-Clear the List?	清空列表？
+Clear the List?	清空列表?
 Clearing the recents	正在清除最近记录
-Reset Minimig?	重启 Minimig？
-Reset settings?	重置设置？
+Reset Minimig?	重启 Minimig?
+Reset settings?	重置设置?
 KP +/- to add/remove drives	小键盘 +/- 增减软驱
 External Drive 2	外部软驱2
 External Drive 3	外部软驱3
@@ -292,13 +292,13 @@ Drives	驱动器
 CD32 drive	CD32 光驱
 not selected	未选择
 CDTV drive	CDTV 光驱
-Fast-IDE (68020)	高速 IDE（68020）
+Fast-IDE (68020)	高速 IDE(68020)
 Sec.	次通道
 Pri.	主通道
 Slave	从设备
 Master	主设备
-Removable/CD	可移动／光驱
-Fixed/HDD	固定／硬盘
+Removable/CD	可移动/光驱
+Fixed/HDD	固定/硬盘
 TV Standard	电视制式
 Scandoubler FX	倍线效果
 Video area by	画面区域依据
@@ -307,16 +307,16 @@ Adaptive	自适应
 Scaling	缩放
 RTG Upscaling	RTG 放大
 Audio Filter	音频滤波
-Auto(LED)	自动（LED）
+Auto(LED)	自动(LED)
 Model	型号
 Paula Output	Paula 输出
 Finish screen adjustment	完成画面调整
 Adjust screen position	调整画面位置
 Available space	可用空间
-Storage: USB	存储：USB
+Storage: USB	存储:USB
 Switch to SD card	切换到 SD 卡
-No USB found, using SD card	未找到USB，使用SD卡
-Storage: SD card	存储：SD卡
+No USB found, using SD card	未找到USB,使用SD卡
+Storage: SD card	存储:SD卡
 Switch to USB	切换到 USB
 Remap keyboard	重新映射键盘
 Define joystick buttons	设置手柄按键
@@ -327,25 +327,25 @@ Mouse Move UP	鼠标上移
 Mouse Btn Left	鼠标左键
 Mouse Btn Right	鼠标右键
 Mouse Btn Middle	鼠标中键
-Mouse Emu/Sniper	鼠标模拟／精确模式
-Menu: OK	菜单：确认
-Menu: Back	菜单：返回
+Mouse Emu/Sniper	鼠标模拟/精确模式
+Menu: OK	菜单:确认
+Menu: Back	菜单:返回
 Lightgun Calibration	光枪校准
 Point to the edge of	瞄准屏幕边缘
 screen and press trigger	并扣动扳机
 to confirm	以确认
-Warning!!!	警告！
+Warning!!!	警告!
 Attention	注意
-This is dangerous operation!	此操作存在风险！
-Script has control over the	脚本能控制整个系统，
-whole system and may damage	可能损坏文件或设置，
-the files or settings, then	导致 MiSTer 无法启动。
+This is dangerous operation!	此操作存在风险!
+Script has control over the	脚本能控制整个系统,
+whole system and may damage	可能损坏文件或设置,
+the files or settings, then	导致 MiSTer 无法启动.
 MiSTer won't boot, so you	届时需要重新格式化
-will have to re-format the	SD 卡并重新复制文件，
-SD card and fill with files	才能恢复使用。
-in order to use it again.	请确认后再继续。
-Do you want to continue?	是否继续？
-Yes, and don't ask again	是，不再询问
+will have to re-format the	SD 卡并重新复制文件,
+SD card and fill with files	才能恢复使用.
+in order to use it again.	请确认后再继续.
+Do you want to continue?	是否继续?
+Yes, and don't ask again	是,不再询问
 BT Pairing	蓝牙配对
 No Bluetooth available	蓝牙适配器不可用
 Finish	完成
@@ -373,7 +373,7 @@ Press any key to cancel	按任意键取消
 Loading...	正在加载…
 <UP-DIR>	<上级>
 <DIR>	<目录>
-No files!	没有文件！
+No files!	没有文件!
 Missing directory	目录不存在
 Code	代码
 Forward	向前
@@ -392,7 +392,7 @@ Queue Tape	加入磁带队列
 Clear Queue	清空队列
 Tape Buttons	磁带按键
 Fast Tape Load	磁带快速加载
-Map Header (Ascii)	映射头部（ASCII）
+Map Header (Ascii)	映射头部(ASCII)
 Tape Details	磁带详情
 Tape Error	磁带错误
 File Size	文件大小
@@ -400,13 +400,13 @@ File Type	文件类型
 File Name	文件名
 Load Addr	加载地址
 Exec Addr	执行地址
-Unable to open file!	无法打开文件！
-Unable to read header!	无法读取文件头！
-Not a m/code Program!	不是机器码程序！
-Not a valid tape!	无效的磁带！
+Unable to open file!	无法打开文件!
+Unable to read header!	无法读取文件头!
+Not a m/code Program!	不是机器码程序!
+Not a valid tape!	无效的磁带!
 Tape Queued	磁带已入队
 Queue Error	队列错误
-Queue limit reached!	队列已满！
+Queue limit reached!	队列已满!
 Floppy Storage	软盘存储
 Machine Model	机器型号
 CPU Speed	CPU 速度
@@ -415,8 +415,8 @@ Rom Management	ROM 管理
 User ROM	用户 ROM
 Floppy Disk ROM	软驱 ROM
 Enable Custom Rom	启用自定义 ROM
-Monitor (40x25)	监控程序（40×25）
-Monitor (80x25)	监控程序（80×25）
+Monitor (40x25)	监控程序(40×25)
+Monitor (80x25)	监控程序(80×25)
 Char Generator	字符发生器
 Key Mapping	按键映射
 Floppy Disk	软盘
@@ -430,7 +430,7 @@ PCG Mode	PCG 模式
 Test SB	测试信号块
 Select Memory Bank	选择内存区
 File	文件
-written!	已写入！
+written!	已写入!
 Dump To	转储到
 Debug Mode	调试模式
 CPU Frequency	CPU 频率
@@ -451,21 +451,21 @@ Paddle mode	拨盘模式
 Scaler not compatible	缩放器不兼容
 Screenshot saved	截图已保存
 Screenshot failed	截图失败
-Kbd mode: Joystick 1	键盘模式：摇杆1
-Kbd mode: Joystick 2	键盘模式：摇杆2
-Kbd mode: Mouse	键盘模式：鼠标
-Kbd mode: Normal	键盘模式：正常
+Kbd mode: Joystick 1	键盘模式:摇杆1
+Kbd mode: Joystick 2	键盘模式:摇杆2
+Kbd mode: Mouse	键盘模式:鼠标
+Kbd mode: Normal	键盘模式:正常
 Saving the state	正在保存状态
-Cannot open bsx_bios.rom!	无法打开 bsx_bios.rom！
-Cannot open goomba.rom!	无法打开 goomba.rom！
+Cannot open bsx_bios.rom!	无法打开 bsx_bios.rom!
+Cannot open goomba.rom!	无法打开 goomba.rom!
 Canceled	已取消
-CD BIOS not found!	未找到光驱 BIOS！
-No rbf found!	未找到核心文件！
-Cart image saved.	卡带镜像已保存。
-Not enough memory!	内存不足！
+CD BIOS not found!	未找到光驱 BIOS!
+No rbf found!	未找到核心文件!
+Cart image saved.	卡带镜像已保存.
+Not enough memory!	内存不足!
 Graphics will be corrupted	画面可能损坏
-Failed to initialize cheat engine!	金手指引擎初始化失败！
-Invalid cheat code! Disabling cheats.	金手指代码无效，已禁用。
+Failed to initialize cheat engine!	金手指引擎初始化失败!
+Invalid cheat code! Disabling cheats.	金手指代码无效,已禁用.
 # Common core-supplied option captions and values. Protocol strings are never rewritten.
 Region	区域
 Auto	自动

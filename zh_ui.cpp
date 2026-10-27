@@ -189,12 +189,18 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     }
 
     const int max_first=std::max(0,(int)candidates.size()-slots);
-    if(!manual && focus>=0 && focus!=footer) {
-        auto it=std::find(candidates.begin(),candidates.end(),focus);
-        if(it!=candidates.end()) {
-            int index=(int)(it-candidates.begin());
-            if(index<first) first=index;
-            if(index>=first+slots) first=index-slots+1;
+    if(!manual && focus>=0) {
+        if(focus==footer) {
+            // Title redraws reset the viewport. With Exit selected, keep
+            // the final options visible above its pinned footer row.
+            first=last_used>slots?max_first:0;
+        } else {
+            auto it=std::find(candidates.begin(),candidates.end(),focus);
+            if(it!=candidates.end()) {
+                int index=(int)(it-candidates.begin());
+                if(index<first) first=index;
+                if(index>=first+slots) first=index-slots+1;
+            }
         }
     }
     first=std::max(0,std::min(first,max_first));
@@ -297,12 +303,6 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			frame[(physical*2)*256+22+x]=upper;
 			frame[(physical*2+1)*256+22+x]=lower;
 		}
-		// A skipped legacy blank row still marks a section boundary. Draw it
-		// in the free top margin instead of spending a whole 16px row on it.
-		if(physical && visible[physical-1]>=0 &&
-		   visible[physical]>visible[physical-1]+1 && !row.invert)
-			for(unsigned x=4;x<230;x+=3)
-				frame[(physical*2)*256+22+x]|=1;
 		// Preserve per-row up/down navigation markers supplied by the core menu.
 		if(row.arrow) for(unsigned x=0;x<8;++x) {
 			unsigned bits=0;
@@ -325,11 +325,16 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 		if(page.rows[i].text.find_first_not_of(" \\t\\r\\n")!=std::string::npos ||
 		   page.rows[i].invert || page.rows[i].arrow)
 			++nonempty;
-	const int entries=(last_used>slots && nonempty>=slots)?nonempty:body_end;
+	const int entries=(last_used>slots && nonempty>=slots)?nonempty:(pinned?body_end:last_used);
 	if(icons && (page.first>0 || page.first+slots<entries)) {
 		for(unsigned x=0;x<8;++x) {
 			if(page.first>0) frame[6+x]=icons[17][x]^255;
-			if(page.first+slots<entries) frame[15*256+6+x]=icons[16][x]^255;
+			if(page.first+slots<entries) {
+				// Center the page-down marker across the 16px exit row.
+				const uint16_t bits=(uint16_t)icons[16][x]<<4;
+				frame[14*256+6+x]=(uint8_t)bits^255;
+				frame[15*256+6+x]=(uint8_t)(bits>>8)^255;
+			}
 		}
 	}
 }

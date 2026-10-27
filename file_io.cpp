@@ -67,9 +67,14 @@ static int iFirstEntry = 0;
 static char full_path[2100];
 uint8_t loadbuf[LOADBUF_SZ];
 
+static int flist_visible_rows()
+{
+	return OsdChinese() ? std::min(OsdGetSize(), 8) : OsdGetSize();
+}
+
 static int flist_last_first_entry()
 {
-	int last = (int)DirItem.size() - OsdGetSize();
+	int last = (int)DirItem.size() - flist_visible_rows();
 	return last > 0 ? last : 0;
 }
 
@@ -85,8 +90,8 @@ static int flist_entry_is_expanded(int entry)
 
 static int flist_page_step(int direction)
 {
-	int step = OsdGetSize();
-	if (step > 1)
+	int step = flist_visible_rows();
+	if (step > 1 && !OsdChinese())
 	{
 		// Forward paging follows the current page. Reverse paging precedes
 		// the page whose selection may consume the extra display row.
@@ -100,7 +105,8 @@ static int flist_page_step(int direction)
 static void flist_center_selected()
 {
 	int count = (int)DirItem.size();
-	if (!count || OsdGetSize() <= 0)
+	const int rows = flist_visible_rows();
+	if (!count || rows <= 0)
 	{
 		iSelectedEntry = 0;
 		iFirstEntry = 0;
@@ -112,15 +118,15 @@ static void flist_center_selected()
 
 	if (cfg.lookahead)
 	{
-		iFirstEntry = iSelectedEntry - (OsdGetSize() / 2);
+		iFirstEntry = iSelectedEntry - (rows / 2);
 	}
 	else if (iSelectedEntry < iFirstEntry)
 	{
 		iFirstEntry = iSelectedEntry;
 	}
-	else if (iSelectedEntry >= iFirstEntry + OsdGetSize())
+	else if (iSelectedEntry >= iFirstEntry + rows)
 	{
-		iFirstEntry = iSelectedEntry - OsdGetSize() + 1;
+		iFirstEntry = iSelectedEntry - rows + 1;
 	}
 
 	if (iFirstEntry < 0) iFirstEntry = 0;
@@ -1708,9 +1714,11 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					}
 				}
 			}
-			// Handle (possible) symbolic link type in the directory entry
-			else if (de->d_type == DT_LNK || de->d_type == DT_REG)
+			// Resolve links and entries whose filesystem-provided type is uncertain.
+			else if (de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN)
 			{
+				// Some filesystems do not report d_type. Resolve it here so
+				// real directories retain directory-first sorting in ROM lists.
 				sprintf(full_path + path_len, "/%s", de->d_name);
 
 				struct stat entrystat;
@@ -1971,14 +1979,18 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_NEXT_PAGE)
 		{
+			int old_first = iFirstEntry;
 			iSelectedEntry += flist_page_step(1);
 			flist_center_selected();
+			if (OsdChinese()) iFirstEntry = std::min(flist_last_first_entry(), old_first + flist_visible_rows());
 			return 0;
 		}
 		else if (mode == SCANF_PREV_PAGE)
 		{
+			int old_first = iFirstEntry;
 			iSelectedEntry -= flist_page_step(-1);
 			flist_center_selected();
+			if (OsdChinese()) iFirstEntry = std::max(0, old_first - flist_visible_rows());
 		}
 		else if (mode == SCANF_SET_ITEM)
 		{
