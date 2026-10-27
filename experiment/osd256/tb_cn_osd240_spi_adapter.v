@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 module tb_spi_adapter;
-reg clk=0,reset=1,sel=0,strobe=0;
+reg clk=0,reset=0,sel=0,strobe=0;
 reg [15:0] din=0;
 wire enabled,we,header,legacy,mode_224p;
 wire [4:0] row;
@@ -26,7 +26,8 @@ begin
  repeat(2) @(negedge clk);
 end endtask
 initial begin
- @(negedge clk);reset=0;
+ @(negedge clk);
+ if(enabled!==0 || mode_224p!==0) $fatal(1,"unsafe uninitialized FPGA power-up state");
  start_packet(8'h20);byte_in(8'hff);end_packet();
  if(enabled!==0) $fatal(1,"legacy command enabled 240p");
  start_packet(8'hF0);byte_in(8'h43);byte_in(8'h4E);
