@@ -21,7 +21,9 @@ assert "cn240_enabled_video <= cn240_enabled_meta;" in src
 assert "cn240_enabled_video ? cn240_video_pixel : osd_pixel" in src
 assert "cn240_mux_pixel" in src
 assert "cn240_running_d2 <= cn240_running_d1;" in src
-assert "cn240_enabled_video ? (cn240_running_d2 && cn240_video_active) : osd_de[2]" in src
+assert "cn240_x_in_range_d1 <= (osd_hcnt < 22\u0027d256);" in src
+assert "cn240_x_in_range_d2 <= cn240_x_in_range_d1;" in src
+assert "cn240_enabled_video ? (cn240_running_d2 && cn240_x_in_range_d2 && cn240_video_active) : osd_de[2]" in src
 print("PASS: persistent SPI-mode connection and actual scan counter tap")
 PY
 # Full Menu_MiSTer elaboration requires all official sys/ modules.
