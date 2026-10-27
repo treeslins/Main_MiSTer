@@ -812,17 +812,6 @@ void OsdUpdate()
 			spi_osd_cmd_cont(OSD_CMD_WRITE | i);
 			spi_write(osdbuf + i * 256, 256, 0);
 			DisableOsd();
-            // Compatibility-only mirror: existing 16 physical rows and
-            // three original status rows. This does NOT create extra menu
-            // rows; the 224p/240p 12/13-row renderer remains future work.
-            if(osd240_explicitly_enabled && OsdChinese() && is_menu()) {
-                if(i>=0 && i<16)
-                    cn_osd240::send_row(cn240_sender, cn_osd240::Bank::Body,
-                                        (uint8_t)i, osdbuf+i*256, 256);
-                else if(i>=16 && i<19)
-                    cn_osd240::send_row(cn240_sender, cn_osd240::Bank::Header,
-                                        (uint8_t)(i-16), osdbuf+i*256, 256);
-            }
 			if (is_megacd()) mcd_poll();
 			if (is_pce()) pcecd_poll();
 			if (is_saturn()) saturn_poll();
@@ -830,6 +819,21 @@ void OsdUpdate()
 			if (is_3do()) p3do_poll();
 		}
 	}
+
+    // Experimental extended menu renderer. It does not touch the legacy
+    // framebuffer and is never sent to a normal menu.rbf.
+    if(osd240_explicitly_enabled && OsdChinese() && is_menu() && !zh_info) {
+        // Future UI wiring will choose this from the actual output mode.
+        const unsigned menu_rows=13;
+        uint8_t expanded[26*256];
+        ZhDrawPageExtended(zh_page,osd_size,arrow,expanded,menu_rows,charfont);
+        for(unsigned i=0;i<menu_rows*2;i++)
+            cn_osd240::send_row(cn240_sender,cn_osd240::Bank::Body,
+                                (uint8_t)i,expanded+i*256,256);
+        for(unsigned i=0;i<3;i++)
+            cn_osd240::send_row(cn240_sender,cn_osd240::Bank::Header,
+                                (uint8_t)i,osdbuf+(i+16)*256,256);
+    }
 
 	osdset = 0;
 }
