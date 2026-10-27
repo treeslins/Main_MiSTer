@@ -24,6 +24,16 @@ wire cn240_video_header;
 wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
+// Synchronize the static mode request into the video domain. This is NOT
+// sufficient for synchronizing framebuffer writes or frame-atomic switching.
+(* ASYNC_REG="TRUE" *) reg cn240_enabled_meta=0;
+(* ASYNC_REG="TRUE" *) reg cn240_enabled_video=0;
+always @(posedge clk_video) begin
+ cn240_enabled_meta <= cn240_enabled;
+ cn240_enabled_video <= cn240_enabled_meta;
+end
+wire cn240_preview_pixel = cn240_enabled_video &&
+                            cn240_video_active && cn240_video_pixel;
 // Demonstrate use of the genuine pixel clock and a registered read port.
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
@@ -69,9 +79,9 @@ text=text.replace(mux_anchor, """\t// The existing legacy output remains the def
 \t// ENABLE ONLY for waveform-level investigation; this does not yet
 \t// implement safe scan scaling or a synchronized mode transition.
 \t`ifdef CN_OSD240_PREVIEW_UNSAFE
-\tordout1 <= {{cn240_video_pixel, cn240_video_pixel, OSD_COLOR[2], din[23:19]},
-\t            {cn240_video_pixel, cn240_video_pixel, OSD_COLOR[1], din[15:11]},
-\t            {cn240_video_pixel, cn240_video_pixel, OSD_COLOR[0], din[7:3]}};
+\tordout1 <= {{cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[2], din[23:19]},
+\t            {cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[1], din[15:11]},
+\t            {cn240_preview_pixel, cn240_preview_pixel, OSD_COLOR[0], din[7:3]}};
 \t`else
 """+mux_anchor,1)
 end_anchor="\t            {osd_pixel, osd_pixel, OSD_COLOR[0], din[7:3]}}; //  7:0"
