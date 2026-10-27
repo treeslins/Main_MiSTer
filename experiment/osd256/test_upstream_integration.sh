@@ -12,6 +12,10 @@ src=Path(sys.argv[1]).read_text()
 assert ".clk(clk_sys), .reset(1'b0)" in src, "SPI mode wrongly tied to OSD enable"
 assert ".x(osd_hcnt[7:0]), .y(osd_vcnt[7:0])" in src
 assert "cn_osd240_dualclock_ram cn240_bank" in src
+assert "cn240_enabled_meta <= cn240_enabled;" in src
+assert "cn240_enabled_video <= cn240_enabled_meta;" in src
+assert "cn240_video_active && cn240_video_pixel" in src
+assert "cn240_preview_pixel" in src
 print("PASS: persistent SPI-mode connection and actual scan counter tap")
 PY
 # Full Menu_MiSTer elaboration requires all official sys/ modules.
