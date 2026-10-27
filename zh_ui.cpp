@@ -143,12 +143,12 @@ static bool zh_footer_label(const ZhRow &row)
            label==u8"空格退出" || label==u8"Ctrl+Esc 退出";
 }
 
-std::vector<int> ZhPage::visible(unsigned logical_rows)
+std::vector<int> ZhPage::visible(unsigned logical_rows, unsigned viewport_rows)
 {
     const unsigned limit=std::min(logical_rows,32u);
     const int footer=(limit && zh_footer_label(rows[limit-1]))?(int)limit-1:-1;
     const int body_end=(footer>=0)?footer:(int)limit;
-    const int slots=(footer>=0)?7:8;
+    const int slots=(footer>=0)?(int)viewport_rows-1:(int)viewport_rows;
     int last_used=0;
     for(int i=0;i<body_end;++i)
         if(!rows[i].source.empty() || !rows[i].text.empty() || rows[i].invert)
@@ -187,7 +187,7 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     for(int i=first;i<(int)candidates.size() && (int)result.size()<slots;++i)
         result.push_back(candidates[i]);
     if(footer>=0) {
-        while(result.size()<7) result.push_back(-1);
+        while(result.size()<viewport_rows-1) result.push_back(-1);
         result.push_back(footer);
     }
     return result;
@@ -261,6 +261,66 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 		for(unsigned x=0;x<8;++x) {
 			if(page.first>0) frame[6+x]=icons[17][x]^255;
 			if(page.first+slots<entries) frame[15*256+6+x]=icons[16][x]^255;
+		}
+	}
+}
+
+void ZhDrawPageExtended(ZhPage &page, unsigned logical_rows, int arrows, uint8_t *frame, unsigned viewport_rows, const unsigned char (*icons)[8])
+{
+	if(viewport_rows!=12 && viewport_rows!=13) return;
+    memset(frame,0,viewport_rows*2*256);
+    auto visible=page.visible(logical_rows,viewport_rows);
+	for(unsigned physical=0;physical<visible.size();++physical) {
+		if(visible[physical]<0) continue;
+		auto &row=page.rows[visible[physical]];
+		uint8_t top[234],bottom[234];
+		std::string text=row.text;
+		if(visible[physical]==(int)logical_rows-1 && !row.raw) {
+			if(arrows&1) text=u8"← "+text;
+			if(arrows&2) text+=u8" →";
+		}
+		if(row.scroll) text+="        "+row.text;
+		ZhRender(text.c_str(),top,bottom,234,false,row.stipple,row.scroll,icons,row.vertical_shift);
+		for(unsigned x=0;x<234;++x) {
+			// Partial highlights are measured in old 8-pixel OSD cells.
+			bool inv=row.invert && (int)((x+22)/8)>=row.mininv && (int)((x+22)/8)<row.maxinv;
+			uint8_t upper=top[x]^(inv?255:0), lower=bottom[x]^(inv?255:0);
+			// Legacy framebuffer is in 8-pixel rows. Chinese OSD occupies
+			// two consecutive physical rows for every logical menu entry.
+			if(false) {
+				// No legacy 16-row background can be indexed beyond its allocation.
+				// Extended renderer deliberately omits the legacy background.
+			}
+			frame[(physical*2)*256+22+x]=upper;
+			frame[(physical*2+1)*256+22+x]=lower;
+		}
+		// Preserve per-row up/down navigation markers supplied by the core menu.
+		if(row.arrow) for(unsigned x=0;x<8;++x) {
+			unsigned bits=0;
+			for(unsigned y=0;y<8;++y) if(icons[row.arrow][x]&(1u<<y)) bits|=3u<<(2*y);
+			frame[physical*2*256+6+x]=(uint8_t)bits^255;
+			frame[(physical*2+1)*256+6+x]=(uint8_t)(bits>>8)^255;
+		}
+	}
+	// Match pagination indicators to the same compacted list as visible().
+	const unsigned upper=std::min(logical_rows,32u);
+	const bool pinned=upper && zh_footer_label(page.rows[upper-1]);
+	const int body_end=pinned?(int)upper-1:(int)upper;
+	const int slots=pinned?(int)viewport_rows-1:(int)viewport_rows;
+	int last_used=0, nonempty=0;
+	for(int i=0;i<body_end;++i) {
+		if(!page.rows[i].source.empty() || !page.rows[i].text.empty() || page.rows[i].invert)
+			last_used=i+1;
+	}
+	for(int i=0;i<last_used;++i)
+		if(page.rows[i].text.find_first_not_of(" \\t\\r\\n")!=std::string::npos ||
+		   page.rows[i].invert || page.rows[i].arrow)
+			++nonempty;
+	const int entries=(last_used>slots && nonempty>=slots)?nonempty:body_end;
+	if(icons && (page.first>0 || page.first+slots<entries)) {
+		for(unsigned x=0;x<8;++x) {
+			if(page.first>0) frame[6+x]=icons[17][x]^255;
+			if(page.first+slots<entries) frame[(viewport_rows*2-1)*256+6+x]=icons[16][x]^255;
 		}
 	}
 }
