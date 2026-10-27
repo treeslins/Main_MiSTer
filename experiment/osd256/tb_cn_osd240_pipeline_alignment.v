@@ -32,6 +32,11 @@ module tb_pipeline_alignment;
  write_byte(1,0,1,8'h02); // y=0 -> 0, y=1 -> 1
  write_byte(0,0,0,8'h01); // y=24 -> 1
  write_byte(0,0,1,8'h02); // y=25 -> 1
+ // Flush the pre-existing RAM read generated while setting up test data.
+ @(negedge clk);y=8'd239;x=0;mode=0;
+ repeat(3) @(posedge clk);
+ #1;
+ if(active!==0) $fatal(1,"pipeline setup failed to flush");
  point(0,0,0,1,1);
  point(1,0,0,1,0);
  point(1,1,0,1,1);
