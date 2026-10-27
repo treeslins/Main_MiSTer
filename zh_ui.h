@@ -29,9 +29,14 @@ struct ZhPage {
     void set(unsigned row, const char *text, bool invert, bool stipple,
              bool raw=false, int mininv=0, int maxinv=32, unsigned char arrow=0,
              unsigned char vertical_shift=0, bool use_background=false);
-    std::vector<int> visible(unsigned logical_rows);
+    std::vector<int> visible(unsigned logical_rows, unsigned viewport_rows=8);
     void page(int direction) { first += direction*6; if(first<0) first=0; manual=true; }
 };
 void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows,
                 int arrows, uint8_t *frame, const unsigned char (*icons)[8],
                 const char (*background)[256] = nullptr);
+// Extended body: 12/13 Chinese rows, 24/26 physical 8px rows.
+// Caller must supply at least viewport_rows*2*256 bytes.
+void ZhDrawPageExtended(ZhPage &page, unsigned logical_rows, int arrows,
+                        uint8_t *frame, unsigned viewport_rows,
+                        const unsigned char (*icons)[8]);
