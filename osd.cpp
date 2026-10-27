@@ -754,7 +754,7 @@ static void zh_compose()
 {
 	for(unsigned i=0;i<(unsigned)osd_size && i<32;++i) {
 		auto &row=zh_page.rows[i];
-		unsigned width=ZhTextWidth(row.text);
+		unsigned width=row.pixel_width;
 		if((row.invert || zh_scroll_active[i]) && width>232) {
 			if(!zh_scroll_times[i]) zh_scroll_times[i]=GetTimer(1000);
 			else if(CheckTimer(zh_scroll_times[i])) {

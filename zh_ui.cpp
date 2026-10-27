@@ -123,6 +123,7 @@ void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
     if(incoming!=r.source || raw!=r.raw) {
         r.source=incoming; r.raw=raw;
         r.text=raw?ZhMixedText(incoming):ZhTranslate(incoming);
+        r.pixel_width=ZhTextWidth(r.text);
         r.scroll=0;
     }
     r.invert=invert; r.stipple=stipple; r.mininv=mininv; r.maxinv=maxinv; r.arrow=arrow;

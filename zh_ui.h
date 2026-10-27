@@ -11,6 +11,7 @@ std::vector<std::string> ZhWrap(const std::string &text, unsigned width);
 
 struct ZhRow {
     std::string source, text;
+    unsigned pixel_width=0;
     bool invert=false, stipple=false, raw=false;
     int mininv=0, maxinv=32;
     unsigned scroll=0;
