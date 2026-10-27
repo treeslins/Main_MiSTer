@@ -39,7 +39,7 @@ module cn_osd240_pixel (
         end else begin
             pixel_bit_q <= logical_y[2:0];
             valid_q <= is_header || is_body;
-            pixel <= ram_data[pixel_bit_q];
+            pixel <= valid_q ? ram_data[pixel_bit_q] : 1'b0;
             active <= valid_q;
         end
     end
