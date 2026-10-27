@@ -16,8 +16,9 @@ assert "cn_osd240_dualclock_ram cn240_bank" in src
 assert "cn_osd240_frame_mode cn240_frame_latch" in src
 assert "cn240_enabled_meta <= cn240_enabled;" in src
 assert "cn240_enabled_video <= cn240_enabled_meta;" in src
-assert "cn240_video_active && cn240_video_pixel" in src
-assert "cn240_preview_pixel" in src
+assert "cn240_enabled_video ? cn240_video_pixel : osd_pixel" in src
+assert "cn240_mux_pixel" in src
+assert "cn240_enabled_video ? cn240_video_active : osd_de[2]" in src
 print("PASS: persistent SPI-mode connection and actual scan counter tap")
 PY
 # Full Menu_MiSTer elaboration requires all official sys/ modules.
