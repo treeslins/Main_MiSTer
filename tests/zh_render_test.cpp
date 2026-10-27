@@ -44,12 +44,14 @@ int main(int argc, char **argv) {
         assert(column_frame[22+234-24+x]==value_top[x]);
         assert(column_frame[256+22+234-24+x]==value_bottom[x]);
     }
-    // Collapsed blank rows still leave a visible section marker.
+    // Collapsed blank rows no longer draw dotted separators.
     ZhPage sections;
     sections.set(0,"First",false,false);
     for(unsigned i=2;i<=8;++i) sections.set(i,"Next",false,false);
     ZhDrawPage(sections,"",16,0,column_frame,column_icons);
-    assert((column_frame[2*256+22+4]&1)!=0);
+    auto section_rows=sections.visible(16);
+    assert(section_rows[0]==0 && section_rows[1]==2);
+    assert(column_frame[2*256+22+226]==0);
     // A compact status page must show its three controls and exit together.
     ZhPage status;
     for(unsigned i=0;i<4;++i) status.set(i,"Status",false,false);
