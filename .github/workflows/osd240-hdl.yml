@@ -85,6 +85,12 @@ jobs:
             experiment/osd256/cn_osd240_pixel.v \
             experiment/osd256/tb_cn_osd240_scan_stream.v
           vvp /tmp/cn-osd240/scan_stream.vvp
+      - name: Verify 224p and 240p active-area boundaries
+        run: |
+          iverilog -g2012 -Wall -s tb_224_240 -o /tmp/cn-osd240/modes.vvp \
+            experiment/osd256/cn_osd240_pixel.v \
+            experiment/osd256/tb_cn_osd240_mode.v
+          vvp /tmp/cn-osd240/modes.vvp
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
