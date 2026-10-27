@@ -88,6 +88,28 @@ int main(int argc, char **argv) {
             if(menu_frame[physical*256+x]) footer_ink=true;
     assert(footer_ink); // Pinned exit is visible in the bottom two OSD rows.
     assert(menu_frame[8*256+40]!=0); // Focused "About" stays in logical row 4.
+    // Extended CRT viewport: verify footer pinning, focus and full-buffer
+    // canaries for both 224p (12 rows) and 240p (13 rows).
+    for(unsigned viewport : {12u, 13u}) {
+        ZhPage ext;
+        for(unsigned i=0;i<20;++i) ext.set(i,"Menu",i==14,false);
+        ext.set(20,"exit",false,false);
+        auto visible_ext=ext.visible(21,viewport);
+        assert(visible_ext.size()==viewport);
+        assert(visible_ext.back()==20);
+        assert(std::find(visible_ext.begin(),visible_ext.end(),14)!=visible_ext.end());
+        std::vector<uint8_t> guarded(viewport*2*256+32,0xA5);
+        ZhDrawPageExtended(ext,21,0,guarded.data()+16,viewport,icons);
+        for(unsigned i=0;i<16;++i) {
+            assert(guarded[i]==0xA5);
+            assert(guarded[guarded.size()-1-i]==0xA5);
+        }
+        bool last_row_ink=false;
+        for(unsigned y=(viewport-1)*2;y<viewport*2;++y)
+            for(unsigned x=22;x<180;++x)
+                if(guarded[16+y*256+x]) last_row_ink=true;
+        assert(last_row_ink);
+    }
     auto mixed=ZhMixedText("\x16");
     assert(ZhRender(mixed.c_str(),a,b,8,false,false,0,icons)==8 && a[0]==3 && b[0]==0);
     auto toggle=ZhMixedText("\x0c A");
