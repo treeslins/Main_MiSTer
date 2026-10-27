@@ -8,7 +8,7 @@ always #5 clk=~clk;
 cn_osd240_ram memory(.clk(clk),.reset(reset),.write_enable(we),
     .write_header(wh),.write_row(wr[4:0]),.write_column(wc),
     .write_data(wd),.read_header(rh),.read_row(row),.read_column(col),.read_data(byte_data));
-cn_osd240_pixel scanner(.clk(clk),.reset(reset),.x(x),.y(y),.ram_data(byte_data),
+cn_osd240_pixel scanner(.clk(clk),.reset(reset),.x(x),.y(y),.mode_224p(1'b0), .ram_data(byte_data),
     .ram_header(rh),.ram_row(row),.ram_column(col),.pixel(pixel),.active(active));
 task put(input h,input [4:0] row_addr,input [7:0] data);
 begin
