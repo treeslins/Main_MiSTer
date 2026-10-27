@@ -32,8 +32,8 @@ initial begin
     sample(23,1); if(pixel!==1) $fatal(1,"header bottom missing");
     sample(24,1); if(pixel!==1) $fatal(1,"body top missing");
     sample(231,1); if(pixel!==1) $fatal(1,"body bottom missing");
-    sample(232,0); if(pixel!==0) $display("NOTE: blank-area pixel is masked by active");
-    sample(239,0);
+    sample(232,0); if(pixel!==0) $fatal(1,"invalid area must have a zero pixel");
+    sample(239,0); if(pixel!==0) $fatal(1,"bottom margin must be blank");
     $display("PASS: 24px status + 208px body + 8px margin scan addressing");
     $finish;
 end
