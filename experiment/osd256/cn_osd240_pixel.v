@@ -30,8 +30,7 @@ module cn_osd240_pixel (
     // Use delayed pixel selector when SRAM data arrives on the next cycle.
     reg [2:0] pixel_bit_q;
     reg valid_q;
-    // Registered RAM read requires an additional valid delay to ensure
-    // active and sampled pixel describe the same requested coordinate.
+    // Data, row-bit selector and active are sampled in matching clock stages.
     always @(posedge clk) begin
         if (reset) begin
             pixel_bit_q <= 0;
