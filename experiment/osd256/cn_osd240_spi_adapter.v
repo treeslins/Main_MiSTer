@@ -10,6 +10,7 @@ module cn_osd240_spi_adapter (
  input wire clk, input wire reset,
  input wire io_osd, input wire io_strobe, input wire [15:0] io_din,
  output reg enabled,
+ output reg mode_224p,
  output reg ext_write, output reg ext_header,
  output reg [4:0] ext_row,
  output reg [7:0] ext_col, output reg [7:0] ext_data,
@@ -24,14 +25,14 @@ module cn_osd240_spi_adapter (
  reg row_valid=0;
  wire rise=io_osd && io_strobe && !old_strobe;
  wire special=(command==8'hF0 || command==8'hF1 ||
-               command==8'hF2 || command==8'hF3);
+               command==8'hF2 || command==8'hF3 || command==8'hF4);
  assign legacy_passthrough = !enabled && !special;
  always @(posedge clk) begin
    old_strobe<=io_strobe;
    old_selected<=io_osd;
    ext_write<=0;
    if(reset) begin
-     enabled<=0; got_command<=0; command<=0; count<=0;
+     enabled<=0; mode_224p<=0; got_command<=0; command<=0; count<=0;
      magic<=0; row_valid<=0;
      ext_header<=0;ext_row<=0;ext_col<=0;ext_data<=0;
    end else if(!io_osd) begin
@@ -46,6 +47,8 @@ module cn_osd240_spi_adapter (
        if(io_din[7:0]==8'hF1) enabled<=0;
      end else begin
        count<=count+9'd1;
+       if(command==8'hF4 && enabled && count==0 && io_din[7:1]==0)
+         mode_224p<=io_din[0];
        if(command==8'hF0 && !enabled) begin
          if((count==0 && io_din[7:0]==8'h43) ||
             (count==1 && magic==1 && io_din[7:0]==8'h4E) ||
