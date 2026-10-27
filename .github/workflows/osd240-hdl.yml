@@ -97,6 +97,11 @@ jobs:
             experiment/osd256/cn_osd240_frame_mode.v \
             experiment/osd256/tb_cn_osd240_frame_mode.v
           vvp /tmp/cn-osd240/frame.vvp
+      - name: Test ARM-side experimental 240p SPI packet encoder
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -o /tmp/cn-osd240/test_arm_spi \
+            experiment/osd256/test_arm_spi.cpp
+          /tmp/cn-osd240/test_arm_spi
       - name: Clarify output scope
         run: |
           echo "HDL syntax and memory-bank simulation only."
