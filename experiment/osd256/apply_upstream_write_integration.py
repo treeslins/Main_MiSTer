@@ -25,6 +25,11 @@ wire [4:0] cn240_video_row;
 wire [7:0] cn240_video_col;
 wire cn240_video_pixel, cn240_video_active;
 reg cn240_line_step=0, cn240_frame_start=0;
+// The official horizontal counter changes only while ce_pix is asserted.
+// Keep the experiment's read-address coordinate stable across intermediate
+// video clocks, and latch on ce_pix instead of using the combinational tap.
+reg [7:0] cn240_scan_x=0;
+always @(posedge clk_video) if(ce_pix) cn240_scan_x <= osd_hcnt[7:0];
 wire [7:0] cn240_scan_y;
 wire cn240_scan_running;
 cn_osd240_vscan cn240_vscan (
@@ -67,7 +72,7 @@ wire cn240_mux_pixel = cn240_enabled_video ? cn240_video_pixel : osd_pixel;
 // Display mux is NOT switched to this path until timing is validated.\n// The SPI adapter must survive chip-select deselection and OSD disable:\n// it resets its per-transaction parser internally on !io_osd.\n// A future upstream hardware reset should use a dedicated reset signal.
 cn_osd240_pixel cn240_reader (
  .clk(clk_video), .reset(1'b0),
- .x(osd_hcnt[7:0]), .y(cn240_scan_y), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
+ .x(cn240_scan_x), .y(cn240_scan_y), .mode_224p(cn240_mode_224p_video), .ram_data(cn240_video_read),
  .ram_header(cn240_video_header), .ram_row(cn240_video_row),
  .ram_column(cn240_video_col), .pixel(cn240_video_pixel),
  .active(cn240_video_active)
