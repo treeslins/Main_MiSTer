@@ -167,9 +167,13 @@ jobs:
             mkdir -p previous-release
             gh release download "$latest" --pattern manifest.txt --dir previous-release
             old_up=$(sed -n 's/^UPSTREAM_SHA=//p' previous-release/manifest.txt)
-            old_cn=$(sed -n 's/^CHINESE_SHA=//p' previous-release/manifest.txt)
-            if [[ "$up" == "$old_up" && "$cn" == "$old_cn" ]]; then
-              echo "Upstream and Chinese source unchanged since $latest; no new release."
+            old_mister=$(awk '$2 == "MiSTer" { print $1 }' previous-release/manifest.txt)
+            old_font=$(awk '$2 == "misterfpga.cn" { print $1 }' previous-release/manifest.txt)
+            new_mister=$(sha256sum dist/MiSTer | cut -d' ' -f1)
+            new_font=$(sha256sum dist/misterfpga.cn | cut -d' ' -f1)
+            [[ "$old_up" =~ ^[0-9a-f]{40}$ && "$old_mister" =~ ^[0-9a-f]{64}$ && "$old_font" =~ ^[0-9a-f]{64}$ ]]
+            if [[ "$up" == "$old_up" && "$new_mister" == "$old_mister" && "$new_font" == "$old_font" ]]; then
+              echo "Upstream and release files unchanged since $latest; no new release."
               exit 0
             fi
           fi
