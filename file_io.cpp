@@ -1862,13 +1862,22 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					dext.altname[name_len - 4] = 0;
 				}
 
-				char *altname = neogeo_get_altname(full_path, dext.de.d_name, dext.altname);
-				if (altname)
+				if (OsdChinese() && dext.de.d_type == DT_REG && !strcasecmp(suffix, ".neo"))
 				{
-					if (altname == (char*)-1) continue;
+					// The .neo header has its own English title. In the Chinese
+					// browser, show the actual UTF-8 filename chosen by the user.
+					dext.altname[name_len - 4] = 0;
+				}
+				else
+				{
+					char *altname = neogeo_get_altname(full_path, dext.de.d_name, dext.altname);
+					if (altname)
+					{
+						if (altname == (char*)-1) continue;
 
-					dext.de.d_type = DT_REG;
-					memcpy(dext.altname, altname, sizeof(dext.altname));
+						dext.de.d_type = DT_REG;
+						memcpy(dext.altname, altname, sizeof(dext.altname));
+					}
 				}
 
 				DirItem.push_back(dext);
