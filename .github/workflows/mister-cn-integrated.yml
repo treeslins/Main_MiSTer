@@ -13,6 +13,8 @@ on:
       - 'osd.h'
       - 'menu.cpp'
       - 'file_io.cpp'
+      - 'cheats.cpp'
+      - 'recent.cpp'
       - 'cfg.*'
       - 'Makefile'
       - 'localization/**'
@@ -68,8 +70,10 @@ jobs:
             tests/zh_render_test.cpp zh_ui.cpp zh_font.cpp \
             -o /tmp/mister-cn-test
           /tmp/mister-cn-test dist/preview.pgm
-          g++ -std=gnu++14 -Wall -Wextra -I. tests/zlabs_loader_test.cpp zh_font.cpp -o /tmp/zlabs-loader-test
-          /tmp/zlabs-loader-test
+          g++ -std=gnu++14 -Wall -Wextra -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -I. tests/zlabs_loader_test.cpp zh_font.cpp -o /tmp/zlabs-loader-test
+          ASAN_OPTIONS=detect_leaks=1 /tmp/zlabs-loader-test
+          ASAN_OPTIONS=detect_leaks=1 python3 tests/font_fallback_test.py /tmp/zlabs-loader-test
           g++ -std=gnu++14 -Wall -Wextra -Werror -fsanitize=address,undefined \
             -fno-omit-frame-pointer -I. \
             tests/zh_osd_compat_test.cpp zh_ui.cpp zh_font.cpp \
@@ -79,6 +83,10 @@ jobs:
             -fno-omit-frame-pointer -I. tests/zh_osd_rows_test.cpp \
             -o /tmp/mister-cn-rows-test
           ASAN_OPTIONS=detect_leaks=1 /tmp/mister-cn-rows-test
+          g++ -std=gnu++14 -Wall -Wextra -Werror -fsanitize=address,undefined \
+            -fno-omit-frame-pointer -I. tests/zh_list_navigation_test.cpp \
+            -o /tmp/mister-cn-list-test
+          ASAN_OPTIONS=detect_leaks=1 /tmp/mister-cn-list-test
 
       - name: Restore cached ARM 10.2 toolchain
         id: compiler

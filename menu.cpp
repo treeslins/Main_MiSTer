@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "profiling.h"
 #include "str_util.h"
 #include "zh_ui.h"
+#include "cn/path_utils.h"
 #include "autofire.h"
 
 /*menu states*/
@@ -387,9 +388,16 @@ static void ResolveExistingCorePath(char *path)
 	}
 }
 
+static bool append_selection_path(const char *name)
+{
+	if (TryJoinPath(selPath, selPath, name)) return true;
+	printf("File selection rejected: path is too long (%s/%s)\n", selPath, name);
+	return false;
+}
+
 static int changeDir(char *dir)
 {
-	char curdir[128];
+	char curdir[256]; // Preserve a complete dirent name, including UTF-8 bytes.
 	memset(curdir, 0, sizeof(curdir));
 	if(!dir || !strcmp(dir, ".."))
 	{
@@ -417,8 +425,7 @@ static int changeDir(char *dir)
 			return 0;
 		}
 
-		if (strlen(selPath)) strcat(selPath, "/");
-		strcat(selPath, dir);
+		if (!append_selection_path(dir)) return 0;
 	}
 
 	ScanDirectory(selPath, SCANF_INIT, fs_pFileExt, fs_Options);
@@ -449,8 +456,8 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
 		strcpy(selPath, get_rbf_dir());
 		if (strlen(get_rbf_name()))
 		{
-			if(strlen(selPath)) strcat(selPath, "/");
-			strcat(selPath, get_rbf_name());
+			// An overlong remembered name must not prevent opening the list.
+			append_selection_path(get_rbf_name());
 		}
 		ResolveExistingCorePath(selPath);
 		pFileExt = "RBFMRAMGL";
@@ -1692,7 +1699,9 @@ void HandleUI(void)
 				}
 				else if (is_menu())
 				{
-					menusub = 6;
+					// The initial core list returns here when Menu/Home is pressed.
+					// Focus the first setting instead of the Exit footer.
+					menusub = 0;
 					SelectFile("", 0, SCANO_CORES, MENU_CORE_FILE_SELECTED1, MENU_SYSTEM1);
 				}
 				else if (is_minimig())
@@ -4585,15 +4594,19 @@ void HandleUI(void)
 	case MENU_ABOUT2:
 		StarsUpdate();
 		m = 0;
-		while (m < 10) OsdDrawLogo(m++);
+		// The Chinese logo occupies one 16px row. Keeping the legacy ten
+		// logo rows would push the version and credits outside its viewport.
+		while (m < (OsdChinese() ? 1 : 10)) OsdDrawLogo(m++);
 		OsdWrite(m++, "     www.MiSTerFPGA.org", 0, 0, 1);
 		OsdWrite(m++, "", 0, 0, 1);
 		if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s", version + 5);
 		else sprintf(s, "       MiSTer v%s", version + 5);
 		OsdWrite(m++, s, 0, 0, 1);
 
-		s[0] = 0;
+		if (OsdChinese()) OsdWrite(m++, OsdCoreNameGet(), 0, 0, 1);
+		else
 		{
+			s[0] = 0;
 			int len = strlen(OsdCoreNameGet());
 			if (len > 30) len = 30;
 			int sp = (30 - len) / 2;
@@ -4602,8 +4615,8 @@ void HandleUI(void)
 			char *s3 = OsdCoreNameGet();
 			for (int i = 0; i < len; i++) *s2++ = *s3++;
 			*s2++ = 0;
+			OsdWrite(m++, s, 0, 0, 1);
 		}
-		OsdWrite(m++, s, 0, 0, 1);
 		OsdWrite(m++, "", 0, 0, 1);
 		ScrollText(m++, "                                 MiSTer by Alexey Melnikov, based on MiST by Till Harbaum, Minimig by Dennis van Weeren and other projects. MiSTer hardware and software is distributed under the terms of the GNU General Public License version 3. MiSTer FPGA cores are the work of their respective authors under individual licensing. Go to www.MiSTerFPGA.org for more details.", 0, 0, 0, 0);
 
@@ -5625,9 +5638,9 @@ void HandleUI(void)
 				if (strlen(selPath))
 				{
 					strcpy(SelectedDir, selPath);
-					strcat(selPath, "/");
 				}
-				strcat(selPath, flist_SelectedItem()->de.d_name);
+				// Cancelling still works if this name cannot be remembered.
+				append_selection_path(flist_SelectedItem()->de.d_name);
 			}
 
 			if (!strcasecmp(fs_pFileExt, "RBF")) selPath[0] = 0;
@@ -5740,8 +5753,7 @@ void HandleUI(void)
 				if ((fs_Options & SCANO_UMOUNT) && (is_megacd() || is_pce() || is_cdi() || is_neogeo() || (is_psx() && !(fs_Options & SCANO_SAVES)) || is_saturn() || is_3do()) && type == DT_DIR && strcmp(flist_SelectedItem()->de.d_name, ".."))
 				{
 					int len = strlen(selPath);
-					strcat(selPath, "/");
-					strcat(selPath, name);
+					if (!append_selection_path(name)) break;
 					int num = ScanDirectory(selPath, SCANF_INIT, fs_pFileExt, 0);
 					if (num != 1) selPath[len] = 0;
 					else
@@ -5764,17 +5776,16 @@ void HandleUI(void)
 						if (strlen(selPath))
 						{
 							strcpy(SelectedDir, selPath);
-							strcat(selPath, "/");
 						}
 						strcpy(SelectedLabel, flist_SelectedItem()->altname);
 						if (fs_Options & SCANO_CORES)
 						{
 							int len = strlen(SelectedLabel);
-							if (SelectedLabel[len - 4] == '.') SelectedLabel[len - 4] = 0;
+							if (len > 4 && SelectedLabel[len - 4] == '.') SelectedLabel[len - 4] = 0;
 							char *p = strstr(SelectedLabel, "_20");
 							if (p) *p = 0;
 						}
-						strcat(selPath, name);
+						if (!append_selection_path(name)) break;
 						menustate = fs_MenuSelect;
 						helptext_idx = 0;
 					}
@@ -8465,7 +8476,7 @@ void PrintDirectory(int expand)
 {
 	if(OsdChinese()) {
 		ScrollReset();
-		const int visible_rows=OsdGetSize()<8?OsdGetSize():8;
+		const int visible_rows=OsdGetVisibleRows();
 		for(int i=0;i<visible_rows;++i) {
 			int k=flist_iFirstEntry()+i;
 			std::string label;

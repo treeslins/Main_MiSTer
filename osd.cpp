@@ -680,9 +680,24 @@ void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned
 {
 	if(OsdChinese()) {
 		if((unsigned char)n<osd_size && (unsigned char)n<32 && str) {
-			if(zh_page.rows[(unsigned)n].source!=str) zh_scroll_times[(unsigned)n]=0;
-			zh_page.set((unsigned)n,str,invert,false,!translate,0,32,0,0,false,right_label);
-			zh_scroll_active[(unsigned)n]=true; zh_dirty=true;
+			const unsigned row_index=(unsigned char)n;
+			const auto &row=zh_page.rows[row_index];
+			const unsigned prefix_bytes=off>0?(unsigned)off:0;
+			const bool changed=row.source!=str || row.invert!=(invert!=0) || row.raw!=!translate ||
+			                   row.right_label!=(right_label?right_label:"") ||
+			                   row.prefix_bytes!=prefix_bytes ||
+			                   (invert && zh_page.focus!=(int)row_index);
+			if(changed) {
+				zh_scroll_times[row_index]=0;
+				// Updating scrolling text must not erase its navigation marker,
+				// disabled style, partial highlight or background parameters.
+				zh_page.set(row_index,str,invert,row.stipple,!translate,row.mininv,row.maxinv,
+				            row.arrow,row.vertical_shift,row.use_background,right_label,prefix_bytes);
+				zh_dirty=true;
+			}
+			// Repeated calls with unchanged text need no full-page repaint.
+			// zh_compose() marks the page dirty when the scroll timer advances.
+			zh_scroll_active[row_index]=true;
 		}
 		return;
 	}
@@ -756,8 +771,9 @@ static void zh_compose()
 		auto &row=zh_page.rows[i];
 		unsigned width=row.pixel_width;
 		const unsigned suffix_width=std::min(row.right_width,234u);
-		const unsigned name_width=suffix_width?(suffix_width+8u<234u?234u-suffix_width-8u:0u):232u;
-		if((row.invert || zh_scroll_active[i]) && width>name_width) {
+		const unsigned name_width=suffix_width?(suffix_width+8u<234u?234u-suffix_width-8u:0u):234u;
+		const unsigned text_width=name_width-std::min(row.prefix_width,name_width);
+		if((row.invert || zh_scroll_active[i]) && width>text_width) {
 			if(!zh_scroll_times[i]) zh_scroll_times[i]=GetTimer(1000);
 			else if(CheckTimer(zh_scroll_times[i])) {
 				row.scroll=(row.scroll+1)%(width+64);

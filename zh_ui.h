@@ -10,9 +10,10 @@ unsigned ZhTextWidth(const std::string &text);
 std::vector<std::string> ZhWrap(const std::string &text, unsigned width);
 
 struct ZhRow {
-    std::string source, text, right_label;
-    unsigned pixel_width=0;
+    std::string source, text, right_label, fixed_prefix;
+    unsigned pixel_width=0; // Scrolling body width; excludes fixed_prefix.
     unsigned right_width=0;
+    unsigned prefix_width=0, prefix_bytes=0;
     bool invert=false, stipple=false, raw=false;
     int mininv=0, maxinv=32;
     unsigned scroll=0;
@@ -26,12 +27,13 @@ struct ZhRow {
 struct ZhPage {
     ZhRow rows[32];
     int first=0, focus=-1;
+    int body_entries=0; // Computed by visible(); also used by page indicators.
     bool manual=false;
     void clear();
     void set(unsigned row, const char *text, bool invert, bool stipple,
              bool raw=false, int mininv=0, int maxinv=32, unsigned char arrow=0,
              unsigned char vertical_shift=0, bool use_background=false,
-             const char *right_label="");
+             const char *right_label="", unsigned prefix_bytes=0);
     std::vector<int> visible(unsigned logical_rows);
     void page(int direction) { first += direction*6; if(first<0) first=0; manual=true; }
 };

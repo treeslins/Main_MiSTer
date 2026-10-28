@@ -75,6 +75,40 @@ int main(int argc, char **argv) {
     short_exit_page.set(15,"exit",true,false);
     auto short_exit_rows=short_exit_page.visible(16);
     assert(short_exit_rows.size()==8 && short_exit_rows[0]==0 && short_exit_rows[3]==3 && short_exit_rows[7]==15);
+    assert(short_exit_page.body_entries==7);
+    short_exit_page.page(1);
+    short_exit_page.visible(16);
+    assert(short_exit_page.first==0); // No page containing only unused rows.
+    column_icons[16][0]=0xff;
+    column_icons[17][0]=0xff;
+    ZhDrawPage(short_exit_page,"",16,0,column_frame,column_icons);
+    assert(column_frame[6]==0xff && column_frame[14*256+6]==0xff);
+    // Arrow counts use the very same compacted rows as the viewport.
+    ZhPage whitespace;
+    for(unsigned i=0;i<8;++i) whitespace.set(i,i==1?"\t":"n",false,false,true);
+    whitespace.set(8,"Last",false,false,true);
+    whitespace.set(15,"exit",false,false);
+    ZhDrawPage(whitespace,"",16,0,column_frame,column_icons);
+    assert(whitespace.body_entries==8);
+    assert(column_frame[14*256+6]!=0xff);
+    whitespace.page(1);
+    ZhDrawPage(whitespace,"",16,0,column_frame,column_icons);
+    assert(whitespace.first==1 && column_frame[14*256+6]==0xff);
+    // Chinese About uses compact rows instead of the legacy ten-row logo.
+    ZhPage about;
+    about.set(0,"MiSTer",false,false);
+    about.set(1,"www.MiSTerFPGA.org",false,false);
+    about.set(2,"",false,false);
+    about.set(3,"MiSTerFPGA.cn v261028",false,false);
+    about.set(4,"Core name",false,false);
+    about.set(5,"",false,false);
+    about.set(6,"Copyright",false,false);
+    auto about_rows=about.visible(16);
+    for(int row : {0,1,3,4,6})
+        assert(std::find(about_rows.begin(),about_rows.end(),row)!=about_rows.end());
+    assert(about.body_entries==8 && about.first==0);
+    ZhDrawPage(about,"",16,0,column_frame,column_icons);
+    assert(column_frame[6]==0xff && column_frame[14*256+6]==0xff);
     for(unsigned size=8;size<=18;++size) {
         ZhPage page;
         for(unsigned i=0;i<size-1;++i) page.set(i,"Menu",false,false);

@@ -117,20 +117,33 @@ std::vector<std::string> ZhWrap(const std::string &text, unsigned width)
 void ZhPage::clear()
 {
     for(auto &r : rows) r=ZhRow{};
-    first=0; focus=-1; manual=false;
+    first=0; focus=-1; body_entries=0; manual=false;
 }
 
 void ZhPage::set(unsigned row, const char *source, bool invert, bool stipple,
                  bool raw, int mininv, int maxinv, unsigned char arrow,
                  unsigned char vertical_shift, bool use_background,
-                 const char *right_label)
+                 const char *right_label, unsigned prefix_bytes)
 {
     if(row>=32) return;
     auto &r=rows[row];
     const std::string incoming=source?source:"";
-    if(incoming!=r.source || raw!=r.raw) {
+    if(incoming!=r.source || raw!=r.raw || prefix_bytes!=r.prefix_bytes) {
         r.source=incoming; r.raw=raw;
-        r.text=raw?ZhMixedText(incoming):ZhTranslate(incoming);
+        r.prefix_bytes=prefix_bytes;
+        // Legacy ScrollText offsets are byte counts. Stop on a complete
+        // UTF-8 character so an offset cannot split a Chinese glyph.
+        const char *start=incoming.c_str(), *end=start;
+        size_t prefix_end=0;
+        while(*end && (size_t)(end-start)<prefix_bytes) {
+            ZhDecode(end);
+            if((size_t)(end-start)>prefix_bytes) break;
+            prefix_end=(size_t)(end-start);
+        }
+        r.fixed_prefix=ZhMixedText(incoming.substr(0,prefix_end));
+        r.prefix_width=ZhTextWidth(r.fixed_prefix);
+        const std::string body=incoming.substr(prefix_end);
+        r.text=raw?ZhMixedText(body):ZhTranslate(body);
         r.pixel_width=ZhTextWidth(raw?r.text:trim_layout_space(r.text));
         r.scroll=0;
     }
@@ -174,7 +187,9 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
     // 16px OSD rows leave only seven body slots: remove separators only when
     // required, so actual entries remain reachable by focus/page controls.
     if(last_used<=slots) {
-        for(int i=0;i<body_end;++i) candidates.push_back(i);
+        // Keep the current screen's blank slots, but do not create empty
+        // pages from the unused tail of a legacy 16-row menu.
+        for(int i=0;i<std::min(body_end,slots);++i) candidates.push_back(i);
     } else {
         for(int i=0;i<last_used;++i)
             if(rows[i].text.find_first_not_of(" \t\r\n")!=std::string::npos ||
@@ -188,7 +203,8 @@ std::vector<int> ZhPage::visible(unsigned logical_rows)
         }
     }
 
-    const int max_first=std::max(0,(int)candidates.size()-slots);
+    body_entries=(int)candidates.size();
+    const int max_first=std::max(0,body_entries-slots);
     if(!manual && focus>=0) {
         if(focus==footer) {
             // Title redraws reset the viewport. With Exit selected, keep
@@ -268,8 +284,12 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 		const unsigned suffix_width=std::min(row.right_width,234u);
 		const unsigned gap=suffix_width?8u:0u;
 		const unsigned name_width=suffix_width+gap<234u?234u-suffix_width-gap:0u;
+		const unsigned prefix_width=std::min(row.prefix_width,name_width);
+		const unsigned text_width=name_width-prefix_width;
+		if(prefix_width) ZhRender(row.fixed_prefix.c_str(),top,bottom,prefix_width,
+		                         false,row.stipple,0,icons,row.vertical_shift);
 		bool aligned_value=false;
-		if(!row.raw && !suffix_width && !row.scroll) {
+		if(!row.raw && !suffix_width && !prefix_width && !row.scroll) {
 			const size_t ascii_colon=text.find(':');
 			const size_t wide_colon=text.find(u8"：");
 			const size_t colon=std::min(ascii_colon,wide_colon);
@@ -286,7 +306,8 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 				}
 			}
 		}
-		if(!aligned_value) ZhRender(text.c_str(),top,bottom,name_width,false,row.stipple,row.scroll,icons,row.vertical_shift);
+		if(!aligned_value) ZhRender(text.c_str(),top+prefix_width,bottom+prefix_width,text_width,
+		                           false,row.stipple,row.scroll,icons,row.vertical_shift);
 		if(suffix_width) ZhRender(row.right_label.c_str(),top+234-suffix_width,
 		                           bottom+234-suffix_width,suffix_width,false,row.stipple,
 		                           0,icons,row.vertical_shift);
@@ -304,7 +325,7 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 			frame[(physical*2+1)*256+22+x]=lower;
 		}
 		// Preserve per-row up/down navigation markers supplied by the core menu.
-		if(row.arrow) for(unsigned x=0;x<8;++x) {
+		if(row.arrow && icons) for(unsigned x=0;x<8;++x) {
 			unsigned bits=0;
 			for(unsigned y=0;y<8;++y) if(icons[row.arrow][x]&(1u<<y)) bits|=3u<<(2*y);
 			frame[physical*2*256+6+x]=(uint8_t)bits^255;
@@ -314,18 +335,8 @@ void ZhDrawPage(ZhPage &page, const std::string &title, unsigned logical_rows, i
 	// Match pagination indicators to the same compacted list as visible().
 	const unsigned upper=std::min(logical_rows,32u);
 	const bool pinned=upper && zh_footer_label(page.rows[upper-1]);
-	const int body_end=pinned?(int)upper-1:(int)upper;
 	const int slots=pinned?7:8;
-	int last_used=0, nonempty=0;
-	for(int i=0;i<body_end;++i) {
-		if(!page.rows[i].source.empty() || !page.rows[i].text.empty() || page.rows[i].invert)
-			last_used=i+1;
-	}
-	for(int i=0;i<last_used;++i)
-		if(page.rows[i].text.find_first_not_of(" \\t\\r\\n")!=std::string::npos ||
-		   page.rows[i].invert || page.rows[i].arrow)
-			++nonempty;
-	const int entries=(last_used>slots && nonempty>=slots)?nonempty:(pinned?body_end:last_used);
+	const int entries=page.body_entries;
 	if(icons && (page.first>0 || page.first+slots<entries)) {
 		for(unsigned x=0;x<8;++x) {
 			if(page.first>0) frame[6+x]=icons[17][x]^255;

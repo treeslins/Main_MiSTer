@@ -40,10 +40,21 @@ def verify(path: Path):
     )
     if ascii_count != 95 or gb_count != 6763:
         raise ValueError(f"font coverage changed: ASCII {ascii_count}, GB2312 {gb_count}")
+    catalog = Path(__file__).resolve().parents[1] / 'localization/zh_CN.tsv'
+    translated = ''.join(line.split('\t', 1)[1] for line in
+                         catalog.read_text(encoding='utf-8').splitlines()
+                         if line and not line.startswith('#'))
+    # Dynamic labels written directly by menu.cpp are outside the catalog.
+    translated += '上级目录目录代码有线连接无线未连接电量充电放电核心分辨率菜单分辨率←→'
+    required = {ord(char) for char in translated if not char.isspace()}
+    missing = required - codes
+    if missing:
+        raise ValueError('Menu glyphs missing: ' + ', '.join(f'U+{cp:04X}' for cp in sorted(missing)))
     return {
         "format": "M16CN004", "source": "pinned-static-file",
         "sha256": digest, "file_size": len(data), "glyph_count": count,
         "ascii_printable_count": ascii_count, "gb2312_hanzi_count": gb_count,
+        "menu_required_glyph_count": len(required), "menu_missing_glyph_count": len(missing),
     }
 
 def main():

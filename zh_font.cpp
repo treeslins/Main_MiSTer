@@ -48,7 +48,8 @@ bool load_once() {
     for (uint32_t i = 0; i < count; ++i) {
         const uint8_t *row = temp.data() + 16 + static_cast<size_t>(i) * 40;
         uint32_t cp = le32(row);
-        if (cp <= previous || (row[4] != 6 && row[4] != 12) ||
+        if (cp <= previous || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff) ||
+            (row[4] != 6 && row[4] != 12) ||
             row[5] || row[6] || row[7]) return false;
         previous = cp;
     }

@@ -1,10 +1,18 @@
 #include "zh_font.h"
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 // No bundled or generated Unifont. Requires MISTER_CN_FONT_PATH pointing
 // to the already generated, pinned SIL OFL 1.1 misterfpga.cn file.
-int main() {
+int main(int argc, char **argv) {
+    if(argc==2 && !strcmp(argv[1],"--expect-fallback")) {
+        assert(!ZhFontReady());
+        assert(!ZhFindGlyph('A'));
+        assert(!ZhFontReady());
+        puts("Missing/invalid font: loader rejection PASS");
+        return 0;
+    }
     assert(ZhFontReady());
     const ZhGlyph *zh = ZhFindGlyph(0x4E2D); // 中
     assert(zh && zh->width == 12);

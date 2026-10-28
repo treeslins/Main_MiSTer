@@ -41,6 +41,12 @@ void OsdCoreNameSet(const char* str);
 char* OsdCoreNameGet();
 void OsdSetSize(int n);
 int OsdGetSize();
+// List navigation must use displayed entries, not legacy 8-pixel OSD rows.
+inline int OsdGetVisibleRows()
+{
+	const int rows = OsdGetSize();
+	return OsdChinese() && rows > 8 ? 8 : rows;
+}
 int OsdGetRotation(bool scaled);
 
 #define OsdIsBig (OsdGetSize()>8)

@@ -69,5 +69,38 @@ int main() {
         assert(guard.front[i]==0xa5);
         assert(guard.rear[i]==0xa5);
     }
+    // Text-only callers may omit the legacy icon table even with a marker.
+    page.clear();
+    page.set(0,"Marker",true,false,false,0,32,17);
+    ZhDrawPage(page,"",8,0,frame,nullptr);
+    // Cheat status is a fixed three-byte prefix: space, icon, space.
+    // The pixels of this prefix must not move with a long UTF-8 name.
+    icons[0x1a][0]=0x55;
+    icons[0x1a][3]=0x7f;
+    const char *cheat_name=u8" \x1a 中文AB123中文CD456中文EF789中文GH012中文IJ345";
+    page.clear();
+    page.set(0,cheat_name,true,false,true,0,32,17,0,false,"",3);
+    assert(page.rows[0].prefix_width==20);
+    uint8_t stationary[16*256];
+    ZhDrawPage(page,"",8,0,stationary,icons);
+    for(unsigned offset : {1u,7u,20u,65u}) {
+        page.rows[0].scroll=offset;
+        ZhDrawPage(page,"",8,0,frame,icons);
+        for(unsigned x=0;x<20;++x) {
+            assert(frame[22+x]==stationary[22+x]);
+            assert(frame[256+22+x]==stationary[256+22+x]);
+        }
+        assert(memcmp(frame+42,stationary+42,214) ||
+               memcmp(frame+256+42,stationary+256+42,214));
+    }
+    // Reusing the row for a normal write removes the old fixed prefix.
+    page.set(0,"Normal",false,false);
+    assert(page.rows[0].prefix_width==0 && page.rows[0].fixed_prefix.empty());
+    // A byte offset inside a Hanzi must not produce invalid UTF-8 fragments.
+    page.set(0,u8"中文",false,false,true,0,32,0,0,false,"",2);
+    assert(page.rows[0].fixed_prefix.empty() && page.rows[0].text==u8"中文");
+    page.set(0,u8"中文",false,false,true,0,32,0,0,false,"",3);
+    assert(page.rows[0].fixed_prefix==u8"中" && page.rows[0].text==u8"文");
+    assert(page.rows[0].prefix_width==12 && page.rows[0].pixel_width==12);
     puts("ZH OSD special offset/background and 32-row bounds: PASS");
 }

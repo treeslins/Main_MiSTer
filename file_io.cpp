@@ -21,6 +21,7 @@
 #include <set>
 #include "lib/miniz/miniz.h"
 #include "osd.h"
+#include "cn/path_utils.h"
 #include "fpga_io.h"
 #include "menu.h"
 #include "errno.h"
@@ -69,7 +70,7 @@ uint8_t loadbuf[LOADBUF_SZ];
 
 static int flist_visible_rows()
 {
-	return OsdChinese() ? std::min(OsdGetSize(), 8) : OsdGetSize();
+	return OsdGetVisibleRows();
 }
 
 static int flist_last_first_entry()
@@ -1338,6 +1339,7 @@ void FindStorage(void)
 }
 
 #include "cn/pinyin_sort_data.h"
+#include "cn/list_navigation.h"
 
 static const char *pinyin_for(uint32_t cp)
 {
@@ -1674,14 +1676,18 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 			}
 		}
 
+		// FileIsZipped writes a second NUL after a path ending in .zip.
+		if (strlen(path) >= sizeof(scanned_path) || !TryJoinPath(full_path, sizeof(full_path) - 1, getRootDir(), path) ||
+		    ((options & SCANO_NEOGEO) && strlen(path) + sizeof("/romsets.xml") > sizeof(full_path)))
+		{
+			printf("Directory scan rejected: path is too long (%s)\n", path);
+			return 0;
+		}
 		if (!isPathDirectory(path)) return 0;
 		snprintf(scanned_path, sizeof(scanned_path), "%s", path);
 		scanned_opts = options;
 
 		if (options & SCANO_NEOGEO) neogeo_scan_xml(path);
-
-		sprintf(full_path, "%s/%s", getRootDir(), path);
-		int path_len = strlen(full_path);
 
 		const char* is_zipped = strcasestr(full_path, ".zip");
 		if (is_zipped && strcasestr(is_zipped + 4, ".zip"))
@@ -1780,24 +1786,25 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					}
 				}
 			}
-			// Resolve links and entries whose filesystem-provided type is uncertain.
-			else if (de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN)
+			else
 			{
-				// Some filesystems do not report d_type. Resolve it here so
-				// real directories retain directory-first sorting in ROM lists.
-				sprintf(full_path + path_len, "/%s", de->d_name);
-
-				struct stat entrystat;
-
-				if (!stat(full_path, &entrystat))
+				char entry_path[sizeof(full_path)];
+				if (!TryJoinPath(entry_path, full_path, de->d_name) ||
+				    ((options & SCANO_NEOGEO) && strlen(entry_path) + sizeof("/romset.xml") > sizeof(entry_path)))
 				{
-					if (S_ISREG(entrystat.st_mode))
+					// The Neo Geo name reader also appends /romset.xml to its
+					// 1024-byte path. Reject unsupported paths before calling it.
+					printf("Directory entry skipped: path is too long (%s/%s)\n", full_path, de->d_name);
+					continue;
+				}
+				// Resolve links and entries whose filesystem-provided type is uncertain.
+				if (de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN)
+				{
+					struct stat entrystat;
+					if (!stat(entry_path, &entrystat))
 					{
-						de->d_type = DT_REG;
-					}
-					else if (S_ISDIR(entrystat.st_mode))
-					{
-						de->d_type = DT_DIR;
+						if (S_ISREG(entrystat.st_mode)) de->d_type = DT_REG;
+						else if (S_ISDIR(entrystat.st_mode)) de->d_type = DT_DIR;
 					}
 				}
 			}
@@ -1819,14 +1826,19 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
             }
 
 
+			// Entries such as '.', '..', or short ROM names have no four-byte
+			// suffix. Never form a pointer before the start of d_name.
+			const size_t name_len = strlen(de->d_name);
+			const char *suffix = name_len >= 4 ? de->d_name + name_len - 4 : "";
 			if (options & SCANO_NEOGEO)
 			{
-				if (de->d_type == DT_REG && !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".zip"))
+				if (de->d_type == DT_REG && !strcasecmp(suffix, ".zip"))
 				{
 					de->d_type = DT_DIR;
+					isZip = 1;
 				}
 
-				if (strcasecmp(de->d_name + strlen(de->d_name) - 4, ".neo"))
+				if (strcasecmp(suffix, ".neo"))
 				{
 					if (de->d_type != DT_DIR) continue;
 				}
@@ -1845,9 +1857,11 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 				memset(&dext, 0, sizeof(dext));
 				memcpy(&dext.de, de, sizeof(dext.de));
 				memcpy(dext.altname, de->d_name, sizeof(dext.altname));
-				if (!strcasecmp(dext.altname + strlen(dext.altname) - 4, ".zip")) dext.altname[strlen(dext.altname) - 4] = 0;
+				if (isZip) {
+					dext.flags |= DT_EXT_ZIP;
+					dext.altname[name_len - 4] = 0;
+				}
 
-				full_path[path_len] = 0;
 				char *altname = neogeo_get_altname(full_path, dext.de.d_name, dext.altname);
 				if (altname)
 				{
@@ -1904,7 +1918,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					{
 						const char *ext = extension;
 						int found = (has_trd && x2trd_ext_supp(de->d_name));
-						if (!found && !(options & SCANO_NOZIP) && !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".zip") && (options & SCANO_DIR))
+						if (!found && !(options & SCANO_NOZIP) && !strcasecmp(suffix, ".zip") && (options & SCANO_DIR))
 						{
 							// Fake that zip-file is a directory.
 							de->d_type = DT_DIR;
@@ -1913,7 +1927,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 						}
 						if (!found && is_minimig() && !memcmp(extension, "HDF", 3))
 						{
-							found = !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".iso");
+							found = !strcasecmp(suffix, ".iso");
 						}
 
 						char *fext = strrchr(de->d_name, '.');
@@ -2045,18 +2059,23 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_NEXT_PAGE)
 		{
-			int old_first = iFirstEntry;
-			iSelectedEntry += flist_page_step(1);
-			flist_center_selected();
-			if (OsdChinese()) iFirstEntry = std::min(flist_last_first_entry(), old_first + flist_visible_rows());
+			if (OsdChinese())
+				OsdListPage(true, flist_nDirEntries(), flist_visible_rows(), iFirstEntry, iSelectedEntry);
+			else {
+				iSelectedEntry += flist_page_step(1);
+				flist_center_selected();
+			}
 			return 0;
 		}
 		else if (mode == SCANF_PREV_PAGE)
 		{
-			int old_first = iFirstEntry;
-			iSelectedEntry -= flist_page_step(-1);
-			flist_center_selected();
-			if (OsdChinese()) iFirstEntry = std::max(0, old_first - flist_visible_rows());
+			if (OsdChinese())
+				OsdListPage(false, flist_nDirEntries(), flist_visible_rows(), iFirstEntry, iSelectedEntry);
+			else {
+				iSelectedEntry -= flist_page_step(-1);
+				flist_center_selected();
+			}
+			return 0;
 		}
 		else if (mode == SCANF_SET_ITEM)
 		{

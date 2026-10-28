@@ -13,7 +13,7 @@
 
 ## 自动更新
 
-`.github/workflows/mister-cn-integrated.yml` 每天北京时间 11:27 检查官方 `MiSTer-devel/Main_MiSTer/master`，在 **CI 临时工作树** 中尝试 Git merge，测试词库、字体、菜单，然后 ARM 10.2 交叉编译；冲突或测试失败就停止，旧成功产物不被覆盖。
+`.github/workflows/mister-cn-integrated.yml` 配置了每天北京时间 11:27 检查官方 `MiSTer-devel/Main_MiSTer/master` 的任务；进入默认分支后，GitHub 才会启用定时运行。PR 阶段由匹配的改动或手动触发构建。工作流在 **CI 临时工作树** 中尝试 Git merge，测试词库、字体、菜单，然后 ARM 10.2 交叉编译；冲突或测试失败就停止，旧成功产物不被覆盖。
 
 每次成功的正式触发仅产生独立的 GitHub 预发布版；PR 验证不发布。不会推送合并到 master，也不会自动修改真实 MiSTer 的系统。遇到上游改动覆盖同一功能时仍需人工适配——并非保证所有未来更新都能零冲突自动合并。
 
