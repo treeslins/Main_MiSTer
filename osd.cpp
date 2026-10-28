@@ -39,6 +39,9 @@ as rotated copies of the first 128 entries.  -- AMR
 #include <stdio.h>
 
 #include "osd.h"
+#include "zh_render.h"
+#include "zh_ui.h"
+#include "cn/osd_rows.h"
 #include "cfg.h"
 #include "spi.h"
 
@@ -56,10 +59,19 @@ as rotated copies of the first 128 entries.  -- AMR
 #define OSD_CMD_DISABLE  0x40      // OSD disable command
 
 static int osd_size = 8;
+static ZhPage zh_page;
+static std::string zh_title;
+static bool zh_info=false, zh_dirty=true;
+static unsigned long zh_scroll_times[32]={};
+static bool zh_scroll_active[32]={};
+
+bool OsdChinese() { return cfg.osd_language==1 && ZhFontReady(); }
+void OsdChinesePage(int direction) { zh_page.page(direction); zh_dirty=true; }
 
 void OsdSetSize(int n)
 {
 	osd_size = n;
+	zh_dirty=true;
 }
 
 int OsdGetSize()
@@ -118,6 +130,9 @@ void StarsUpdate()
 		}
 		framebuffer_plot(stars[i].x >> 4, stars[i].y >> 4);
 	}
+	// Chinese rows may use framebuffer as their background. Recompose after
+	// each starfield update, otherwise the new background remains invisible.
+	if (OsdChinese()) zh_dirty = true;
 	osdset = -1;
 }
 
@@ -154,6 +169,16 @@ static void rotatechar(unsigned char *in, unsigned char *out)
 
 void OsdSetTitle(const char *s, int a)
 {
+	if(OsdChinese()) {
+		std::string title=ZhTranslate(s?s:"");
+		// Each title announcement begins a menu page, even when two different
+		// pages translate to the same title. Never retain stale rows or focus.
+		zh_page.clear();
+		memset(zh_scroll_times, 0, sizeof(zh_scroll_times));
+		memset(zh_scroll_active, 0, sizeof(zh_scroll_active));
+		zh_title=title; arrow=a; zh_info=false; zh_dirty=true;
+		return;
+	}
 	// Compose the title, condensing character gaps
 	arrow = a;
 	int zeros = 0;
@@ -208,6 +233,7 @@ void OsdSetTitle(const char *s, int a)
 
 void OsdSetArrow(int a)
 {
+	if (arrow != a) zh_dirty = true; // Repaint translated footer arrows.
 	arrow = a;
 }
 
@@ -245,8 +271,16 @@ static void draw_title(const unsigned char *p)
 }
 
 // write a null-terminated string <s> to the OSD buffer starting at line <n>
-void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv)
+void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsigned char stipple, char offset, char leftchar, char usebg, int maxinv, int mininv, bool translate, const char *right_label)
 {
+	if(OsdChinese() && n<osd_size && n<32) {
+		if(zh_page.rows[n].source!=(s?s:"")) zh_scroll_times[n]=0;
+		zh_page.set(n,s,invert,stipple,!translate,mininv,maxinv,
+		            (unsigned char)leftchar, (unsigned char)((offset>=0 && offset<=7)?offset:0), usebg!=0,right_label);
+		zh_scroll_active[n]=false;
+		zh_dirty=true; zh_info=false;
+		return;
+	}
 	//printf("OsdWriteOffset(%d)\n", n);
 	unsigned short i;
 	unsigned char b;
@@ -380,8 +414,18 @@ void OsdWriteOffset(unsigned char n, const char *s, unsigned char invert, unsign
 	}
 }
 
+void OsdWriteText(const char *text, unsigned char code)
+{
+	zh_page.clear(); zh_info=false; zh_dirty=true;
+	std::string message=ZhTranslate(text?text:"");
+	if(code) message+=u8"\n代码:"+std::to_string(code);
+	auto lines=ZhWrap(message,232);
+	for(unsigned i=0;i<lines.size() && i<8;++i) zh_page.set(i,lines[i].c_str(),false,false,true);
+}
+
 void OsdShiftDown(unsigned char n)
 {
+	if(OsdChinese()) return; // 16-pixel text does not use the 8-pixel exit animation.
 	osd_start(n);
 
 	osdbufpos += 22;
@@ -391,6 +435,7 @@ void OsdShiftDown(unsigned char n)
 
 void OsdDrawLogo(int row)
 {
+	if(OsdChinese()) { if(!row) OsdWrite(0,"MiSTer"); return; }
 	osd_start(row);
 
 	unsigned char bt = 0;
@@ -425,6 +470,25 @@ void OsdDrawLogo(int row)
 
 void OSD_PrintInfo(const char *message, int *width, int *height, int frame)
 {
+	if(OsdChinese()) {
+		auto lines=ZhWrap(ZhTranslate(message?message:""),240);
+		unsigned count=std::min((unsigned)lines.size(),7u), pixels=8;
+		for(unsigned i=0;i<count;++i) pixels=std::max(pixels,ZhTextWidth(lines[i]));
+		*width=std::min(32u,(pixels+23)/8); *height=count*2+2;
+		memset(osdbuf,0,sizeof(osdbuf));
+		for(unsigned i=0;i<count;++i) {
+			uint8_t top[240],bottom[240];
+			ZhRender(lines[i].c_str(),top,bottom,240,false,false,0,charfont);
+			memcpy(osdbuf+(1+i*2)*256+8,top,240);
+			memcpy(osdbuf+(2+i*2)*256+8,bottom,240);
+		}
+		if(frame) {
+			for(int x=0;x<*width*8;++x) { osdbuf[x]|=1; osdbuf[(*height-1)*256+x]|=128; }
+			for(int y=0;y<*height;++y) { osdbuf[y*256]=255; osdbuf[y*256+*width*8-1]=255; }
+		}
+		zh_info=true; zh_dirty=false; osdset=-1;
+		return;
+	}
 	static char str[INFO_MAXW * INFO_MAXH];
 	memset(str, ' ', sizeof(str));
 
@@ -494,8 +558,11 @@ void OSD_PrintInfo(const char *message, int *width, int *height, int frame)
 // clear OSD frame buffer
 void OsdClear(void)
 {
+	zh_page.clear(); zh_info=false; zh_dirty=true;
+	memset(zh_scroll_times,0,sizeof(zh_scroll_times));
+	memset(zh_scroll_active,0,sizeof(zh_scroll_active));
 	osdset = -1;
-	memset(osdbuf, 0, 16 * 256);
+	memset(osdbuf, 0, sizeof(osdbuf));
 }
 
 int OsdGetRotation(bool scaled)
@@ -529,6 +596,8 @@ static void osd_enable(uint8_t cmd, uint16_t x, uint16_t y, uint16_t width, uint
 // enable displaying of OSD
 void OsdEnable(unsigned char mode)
 {
+	zh_info=false; zh_dirty=true;
+	if(OsdChinese()) osdset=-1;
 	user_io_osd_key_enable(mode & DISABLE_KEYBOARD);
 	mode &= (DISABLE_KEYBOARD | OSD_MSG);
 	osd_enable(OSD_CMD_ENABLE | mode, 0, 0, 0, 0);
@@ -607,8 +676,31 @@ static void print_line(unsigned char line, const char *hdr, const char *text, un
 	}
 }
 
-void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx)
+void ScrollText(char n, const char *str, int off, int len, int max_len, unsigned char invert, int idx, bool translate, const char *right_label)
 {
+	if(OsdChinese()) {
+		if((unsigned char)n<osd_size && (unsigned char)n<32 && str) {
+			const unsigned row_index=(unsigned char)n;
+			const auto &row=zh_page.rows[row_index];
+			const unsigned prefix_bytes=off>0?(unsigned)off:0;
+			const bool changed=row.source!=str || row.invert!=(invert!=0) || row.raw!=!translate ||
+			                   row.right_label!=(right_label?right_label:"") ||
+			                   row.prefix_bytes!=prefix_bytes ||
+			                   (invert && zh_page.focus!=(int)row_index);
+			if(changed) {
+				zh_scroll_times[row_index]=0;
+				// Updating scrolling text must not erase its navigation marker,
+				// disabled style, partial highlight or background parameters.
+				zh_page.set(row_index,str,invert,row.stipple,!translate,row.mininv,row.maxinv,
+				            row.arrow,row.vertical_shift,row.use_background,right_label,prefix_bytes);
+				zh_dirty=true;
+			}
+			// Repeated calls with unchanged text need no full-page repaint.
+			// zh_compose() marks the page dirty when the scroll timer advances.
+			zh_scroll_active[row_index]=true;
+		}
+		return;
+	}
 	// this function is called periodically when a string longer than the window is displayed.
 
 #define BLANKSPACE 10 // number of spaces between the end and start of repeated name
@@ -673,10 +765,40 @@ char* OsdCoreNameGet()
 	return lastcorename;
 }
 
+static void zh_compose()
+{
+	for(unsigned i=0;i<(unsigned)osd_size && i<32;++i) {
+		auto &row=zh_page.rows[i];
+		unsigned width=row.pixel_width;
+		const unsigned suffix_width=std::min(row.right_width,234u);
+		const unsigned name_width=suffix_width?(suffix_width+8u<234u?234u-suffix_width-8u:0u):234u;
+		const unsigned text_width=name_width-std::min(row.prefix_width,name_width);
+		if((row.invert || zh_scroll_active[i]) && width>text_width) {
+			if(!zh_scroll_times[i]) zh_scroll_times[i]=GetTimer(1000);
+			else if(CheckTimer(zh_scroll_times[i])) {
+				row.scroll=(row.scroll+1)%(width+64);
+				zh_scroll_times[i]=GetTimer(35); zh_dirty=true;
+			}
+		} else { row.scroll=0; zh_scroll_times[i]=0; }
+	}
+	if(!zh_dirty) return;
+	uint8_t frame[16*256];
+	ZhDrawPage(zh_page,zh_title,osd_size,arrow,frame,charfont,framebuffer);
+	for(unsigned row=0;row<16;++row) if(memcmp(frame+row*256,osdbuf+row*256,256)) {
+		memcpy(osdbuf+row*256,frame+row*256,256); osdset|=1u<<row;
+	}
+	zh_dirty=false;
+}
+
 void OsdUpdate()
 {
 	PROFILE_FUNCTION();
+	if(OsdChinese() && !zh_info) zh_compose();
 	int n = is_menu() ? 19 : osd_size;
+	if(OsdChinese()) {
+		n=is_menu()?19:16;
+		ZhClearUnusedOsdRows(osdbuf, &osdset, n, is_menu());
+	}
 	for (int i = 0; i < n; i++)
 	{
 		if (osdset & (1 << i))

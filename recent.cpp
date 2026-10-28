@@ -9,6 +9,7 @@
 #include "file_io.h"
 #include "user_io.h"
 #include "osd.h"
+#include "cn/list_navigation.h"
 #include "cfg.h"
 #include "recent.h"
 
@@ -88,10 +89,16 @@ void recent_scan(int mode)
 	{
 		if (!recent_available()) return;
 
+		if (OsdChinese() && (mode == SCANF_NEXT_PAGE || mode == SCANF_PREV_PAGE))
+		{
+			OsdListPage(mode == SCANF_NEXT_PAGE, recent_available(), OsdGetVisibleRows(), iFirstEntry, iSelectedEntry);
+			return;
+		}
+
 		if (mode == SCANF_END || (mode == SCANF_PREV && iSelectedEntry <= 0))
 		{
 			iSelectedEntry = recent_available() - 1;
-			iFirstEntry = iSelectedEntry - OsdGetSize() + 1;
+			iFirstEntry = iSelectedEntry - OsdGetVisibleRows() + 1;
 			if (iFirstEntry < 0) iFirstEntry = 0;
 		}
 		else if (mode == SCANF_NEXT)
@@ -99,7 +106,7 @@ void recent_scan(int mode)
 			if (iSelectedEntry + 1 < recent_available()) // scroll within visible items
 			{
 				iSelectedEntry++;
-				if (iSelectedEntry > iFirstEntry + OsdGetSize() - 1) iFirstEntry = iSelectedEntry - OsdGetSize() + 1;
+				if (iSelectedEntry > iFirstEntry + OsdGetVisibleRows() - 1) iFirstEntry = iSelectedEntry - OsdGetVisibleRows() + 1;
 			}
 			else
 			{
@@ -118,24 +125,24 @@ void recent_scan(int mode)
 		}
 		else if (mode == SCANF_NEXT_PAGE)
 		{
-			if (iSelectedEntry < iFirstEntry + OsdGetSize() - 1)
+			if (iSelectedEntry < iFirstEntry + OsdGetVisibleRows() - 1)
 			{
-				iSelectedEntry = iFirstEntry + OsdGetSize() - 1;
+				iSelectedEntry = iFirstEntry + OsdGetVisibleRows() - 1;
 				if (iSelectedEntry >= recent_available()) iSelectedEntry = recent_available() - 1;
 			}
 			else
 			{
-				iSelectedEntry += OsdGetSize();
-				iFirstEntry += OsdGetSize();
+				iSelectedEntry += OsdGetVisibleRows();
+				iFirstEntry += OsdGetVisibleRows();
 				if (iSelectedEntry >= recent_available())
 				{
 					iSelectedEntry = recent_available() - 1;
-					iFirstEntry = iSelectedEntry - OsdGetSize() + 1;
+					iFirstEntry = iSelectedEntry - OsdGetVisibleRows() + 1;
 					if (iFirstEntry < 0) iFirstEntry = 0;
 				}
-				else if (iFirstEntry + OsdGetSize() > recent_available())
+				else if (iFirstEntry + OsdGetVisibleRows() > recent_available())
 				{
-					iFirstEntry = recent_available() - OsdGetSize();
+					iFirstEntry = recent_available() - OsdGetVisibleRows();
 				}
 			}
 		}
@@ -147,7 +154,7 @@ void recent_scan(int mode)
 			}
 			else
 			{
-				iFirstEntry -= OsdGetSize();
+				iFirstEntry -= OsdGetVisibleRows();
 				if (iFirstEntry < 0) iFirstEntry = 0;
 				iSelectedEntry = iFirstEntry;
 			}
@@ -172,7 +179,7 @@ void recent_scroll_name()
 	len = strlen(name); // get name length
 
 	max_len = 30;
-	ScrollText(iSelectedEntry - iFirstEntry, name, 1, len, max_len, 1);
+	ScrollText(iSelectedEntry - iFirstEntry, name, 1, len, max_len, 1, 0, false);
 }
 
 void recent_print()
@@ -184,11 +191,11 @@ void recent_print()
 
 	ScrollReset();
 
-	for (int i = 0; i < OsdGetSize(); i++)
+	for (int i = 0; i < OsdGetVisibleRows(); i++)
 	{
 		char leftchar = 0;
 		unsigned char d = 1;
-		if (i < recent_available())
+		if (iFirstEntry + i < recent_available())
 		{
 			k = iFirstEntry + i;
 
@@ -200,25 +207,26 @@ void recent_print()
 
 			s[len] = 0;
 
-			if (len > 28)
+			if (!OsdChinese() && len > 28)
 			{
 				len = 27; // trim display length if longer than 30 characters
 				s[28] = 22;
 			}
 
-			s[29] = 0;
+			if(!OsdChinese()) s[29] = 0;
 
 			if (!i && k) leftchar = 17;
-			if ((i == OsdGetSize() - 1) && (k < recent_available() - 1)) leftchar = 16;
+			if ((i == OsdGetVisibleRows() - 1) && (k < recent_available() - 1)) leftchar = 16;
 
 			d = ena[k] ? 0 : 1;
 		}
 		else
 		{
 			memset(s, ' ', 32);
+			s[32]=0;
 		}
 
-		OsdWriteOffset(i, s, i == (iSelectedEntry - iFirstEntry) && recent_available(), d, 0, leftchar);
+		OsdWriteOffset(i, s, i == (iSelectedEntry - iFirstEntry) && recent_available(), d, 0, leftchar, 0, 32, 0, false);
 	}
 }
 

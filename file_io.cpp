@@ -21,6 +21,7 @@
 #include <set>
 #include "lib/miniz/miniz.h"
 #include "osd.h"
+#include "cn/path_utils.h"
 #include "fpga_io.h"
 #include "menu.h"
 #include "errno.h"
@@ -67,9 +68,14 @@ static int iFirstEntry = 0;
 static char full_path[2100];
 uint8_t loadbuf[LOADBUF_SZ];
 
+static int flist_visible_rows()
+{
+	return OsdGetVisibleRows();
+}
+
 static int flist_last_first_entry()
 {
-	int last = (int)DirItem.size() - OsdGetSize();
+	int last = (int)DirItem.size() - flist_visible_rows();
 	return last > 0 ? last : 0;
 }
 
@@ -85,8 +91,8 @@ static int flist_entry_is_expanded(int entry)
 
 static int flist_page_step(int direction)
 {
-	int step = OsdGetSize();
-	if (step > 1)
+	int step = flist_visible_rows();
+	if (step > 1 && !OsdChinese())
 	{
 		// Forward paging follows the current page. Reverse paging precedes
 		// the page whose selection may consume the extra display row.
@@ -100,7 +106,8 @@ static int flist_page_step(int direction)
 static void flist_center_selected()
 {
 	int count = (int)DirItem.size();
-	if (!count || OsdGetSize() <= 0)
+	const int rows = flist_visible_rows();
+	if (!count || rows <= 0)
 	{
 		iSelectedEntry = 0;
 		iFirstEntry = 0;
@@ -112,15 +119,15 @@ static void flist_center_selected()
 
 	if (cfg.lookahead)
 	{
-		iFirstEntry = iSelectedEntry - (OsdGetSize() / 2);
+		iFirstEntry = iSelectedEntry - (rows / 2);
 	}
 	else if (iSelectedEntry < iFirstEntry)
 	{
 		iFirstEntry = iSelectedEntry;
 	}
-	else if (iSelectedEntry >= iFirstEntry + OsdGetSize())
+	else if (iSelectedEntry >= iFirstEntry + rows)
 	{
-		iFirstEntry = iSelectedEntry - OsdGetSize() + 1;
+		iFirstEntry = iSelectedEntry - rows + 1;
 	}
 
 	if (iFirstEntry < 0) iFirstEntry = 0;
@@ -1331,8 +1338,119 @@ void FindStorage(void)
 	else if (ENOENT == errno) mkdir(full_path, S_IRWXU | S_IRWXG | S_IRWXO);
 }
 
+#include "cn/pinyin_sort_data.h"
+#include "cn/list_navigation.h"
+
+static const char *pinyin_for(uint32_t cp)
+{
+	size_t lo = 0, hi = sizeof(pinyin_entries) / sizeof(pinyin_entries[0]);
+	while (lo < hi)
+	{
+		size_t mid = lo + (hi - lo) / 2;
+		if (pinyin_entries[mid].codepoint < cp) lo = mid + 1;
+		else hi = mid;
+	}
+	return (lo < sizeof(pinyin_entries) / sizeof(pinyin_entries[0]) && pinyin_entries[lo].codepoint == cp)
+		? pinyin_syllables[pinyin_entries[lo].syllable] : NULL;
+}
+
+static std::string pinyin_sort_key(const char *name, size_t len)
+{
+	std::string key;
+	for (size_t i = 0; i < len;)
+	{
+		unsigned char c = (unsigned char)name[i];
+		if (c < 0x80)
+		{
+			key += (char)tolower(c);
+			++i;
+			continue;
+		}
+		uint32_t cp = 0;
+		size_t bytes = 0;
+		if ((c & 0xE0) == 0xC0) { cp = c & 0x1F; bytes = 2; }
+		else if ((c & 0xF0) == 0xE0) { cp = c & 0x0F; bytes = 3; }
+		else if ((c & 0xF8) == 0xF0) { cp = c & 0x07; bytes = 4; }
+		if (bytes && i + bytes <= len)
+		{
+			bool valid = true;
+			for (size_t j = 1; j < bytes; ++j)
+			{
+				unsigned char next = (unsigned char)name[i + j];
+				if ((next & 0xC0) != 0x80) { valid = false; break; }
+				cp = (cp << 6) | (next & 0x3F);
+			}
+			if (valid)
+			{
+				const char *reading = pinyin_for(cp);
+				if (reading) { key += reading; key += '\1'; }
+				else key.append(name + i, bytes);
+				i += bytes;
+				continue;
+			}
+		}
+		key += (char)c;
+		++i;
+	}
+	return key;
+}
+
+static const char *file_sort_name(const direntext_t& item, int options)
+{
+	const char *name = item.altname;
+	// Core folders hide their leading underscore in the OSD; sort by the
+	// same visible name so their order agrees with the quick-jump key.
+	if ((options & SCANO_CORES) && item.de.d_type == DT_DIR && name[0] == '_' && name[1]) ++name;
+	return name;
+}
+
+static uint32_t file_first_codepoint(const char *name)
+{
+	const unsigned char *p = (const unsigned char *)name;
+	if (p[0] < 0x80) return p[0];
+	if ((p[0] & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80)
+		return ((uint32_t)(p[0] & 0x1F) << 6) | (p[1] & 0x3F);
+	if ((p[0] & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80)
+		return ((uint32_t)(p[0] & 0x0F) << 12) | ((uint32_t)(p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+	return p[0];
+}
+
+static int chinese_name_group(const char *name)
+{
+	uint32_t cp = file_first_codepoint(name);
+	if (cp >= '0' && cp <= '9') return 0;
+	if ((cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z')) return 1;
+	if (cp >= 0x3400 && cp <= 0x9FFF) return 2;
+	return 3;
+}
+
+static bool chinese_directory_first(const direntext_t& item)
+{
+	// ZIP archives are navigable, so the scanner marks them DT_DIR, but
+	// they are ROM files for ordering purposes. Keep physical folders first.
+	return item.de.d_type == DT_DIR && !(item.flags & DT_EXT_ZIP);
+}
+
+static uint32_t file_jump_key(const direntext_t& item, int options)
+{
+	const bool directory = OsdChinese() ? chinese_directory_first(item) : item.de.d_type == DT_DIR;
+	const char *name = file_sort_name(item, options);
+	if (directory && !strcmp(name, "..")) return 0;
+	uint32_t cp = file_first_codepoint(name);
+	if (!OsdChinese()) return (directory ? 0x10000 : 0x20000) | (uint32_t)toupper((unsigned char)name[0]);
+	const int group = chinese_name_group(name);
+	unsigned initial = '#';
+	if (group == 0 || group == 1) initial = (unsigned)toupper((unsigned char)name[0]);
+	else if (group == 2) {
+		const char *reading = pinyin_for(cp);
+		if (reading) initial = (unsigned)toupper((unsigned char)reading[0]);
+	}
+	return (directory ? 0x10000 : 0x20000) | ((uint32_t)group << 8) | initial;
+}
+
 struct DirentComp
 {
+	explicit DirentComp(int opts) : options(opts), chinese(OsdChinese()) {}
 	bool operator()(const direntext_t& de1, const direntext_t& de2)
 	{
 
@@ -1343,19 +1461,39 @@ struct DirentComp
 		}
 #endif
 
-		if ((de1.de.d_type == DT_DIR) && !strcmp(de1.altname, "..")) return true;
-		if ((de2.de.d_type == DT_DIR) && !strcmp(de2.altname, "..")) return false;
+		bool parent1 = de1.de.d_type == DT_DIR && !strcmp(de1.altname, "..");
+		bool parent2 = de2.de.d_type == DT_DIR && !strcmp(de2.altname, "..");
+		if (parent1 != parent2) return parent1;
+		if (parent1) return false;
 
-		if ((de1.de.d_type == DT_DIR) && (de2.de.d_type != DT_DIR)) return true;
-		if ((de1.de.d_type != DT_DIR) && (de2.de.d_type == DT_DIR)) return false;
+		const bool dir1 = chinese ? chinese_directory_first(de1) : de1.de.d_type == DT_DIR;
+		const bool dir2 = chinese ? chinese_directory_first(de2) : de2.de.d_type == DT_DIR;
+		if (dir1 != dir2) return dir1;
 
-		int len1 = strlen(de1.altname);
-		int len2 = strlen(de2.altname);
-		if ((len1 > 4) && (de1.altname[len1 - 4] == '.')) len1 -= 4;
-		if ((len2 > 4) && (de2.altname[len2 - 4] == '.')) len2 -= 4;
+		const char *name1 = chinese ? file_sort_name(de1, options) : de1.altname;
+		const char *name2 = chinese ? file_sort_name(de2, options) : de2.altname;
+		int len1 = strlen(name1);
+		int len2 = strlen(name2);
+		if ((len1 > 4) && (name1[len1 - 4] == '.')) len1 -= 4;
+		if ((len2 > 4) && (name2[len2 - 4] == '.')) len2 -= 4;
 
 		int len = (len1 < len2) ? len1 : len2;
-		int ret = strncasecmp(de1.altname, de2.altname, len);
+		int ret = 0;
+		if (chinese)
+		{
+			// Directory priority is handled above. Within each type, keep
+			// digits, Latin names and Hanzi in separate contiguous sections.
+			const int group1 = chinese_name_group(name1);
+			const int group2 = chinese_name_group(name2);
+			if (group1 != group2) return group1 < group2;
+			if (group1 == 2) {
+				std::string key1 = pinyin_sort_key(name1, len1);
+				std::string key2 = pinyin_sort_key(name2, len2);
+				ret = key1.compare(key2);
+				if (ret) return ret < 0;
+			}
+		}
+		ret = strncasecmp(name1, name2, len);
 		if (!ret)
 		{
 			if(len1 != len2)
@@ -1369,6 +1507,8 @@ struct DirentComp
 	}
 
 	size_t iterations = 0;
+	int options;
+	bool chinese;
 };
 
 void AdjustDirectory(char *path)
@@ -1536,14 +1676,18 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 			}
 		}
 
+		// FileIsZipped writes a second NUL after a path ending in .zip.
+		if (strlen(path) >= sizeof(scanned_path) || !TryJoinPath(full_path, sizeof(full_path) - 1, getRootDir(), path) ||
+		    ((options & SCANO_NEOGEO) && strlen(path) + sizeof("/romsets.xml") > sizeof(full_path)))
+		{
+			printf("Directory scan rejected: path is too long (%s)\n", path);
+			return 0;
+		}
 		if (!isPathDirectory(path)) return 0;
 		snprintf(scanned_path, sizeof(scanned_path), "%s", path);
 		scanned_opts = options;
 
 		if (options & SCANO_NEOGEO) neogeo_scan_xml(path);
-
-		sprintf(full_path, "%s/%s", getRootDir(), path);
-		int path_len = strlen(full_path);
 
 		const char* is_zipped = strcasestr(full_path, ".zip");
 		if (is_zipped && strcasestr(is_zipped + 4, ".zip"))
@@ -1642,22 +1786,25 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					}
 				}
 			}
-			// Handle (possible) symbolic link type in the directory entry
-			else if (de->d_type == DT_LNK || de->d_type == DT_REG)
+			else
 			{
-				sprintf(full_path + path_len, "/%s", de->d_name);
-
-				struct stat entrystat;
-
-				if (!stat(full_path, &entrystat))
+				char entry_path[sizeof(full_path)];
+				if (!TryJoinPath(entry_path, full_path, de->d_name) ||
+				    ((options & SCANO_NEOGEO) && strlen(entry_path) + sizeof("/romset.xml") > sizeof(entry_path)))
 				{
-					if (S_ISREG(entrystat.st_mode))
+					// The Neo Geo name reader also appends /romset.xml to its
+					// 1024-byte path. Reject unsupported paths before calling it.
+					printf("Directory entry skipped: path is too long (%s/%s)\n", full_path, de->d_name);
+					continue;
+				}
+				// Resolve links and entries whose filesystem-provided type is uncertain.
+				if (de->d_type == DT_LNK || de->d_type == DT_REG || de->d_type == DT_UNKNOWN)
+				{
+					struct stat entrystat;
+					if (!stat(entry_path, &entrystat))
 					{
-						de->d_type = DT_REG;
-					}
-					else if (S_ISDIR(entrystat.st_mode))
-					{
-						de->d_type = DT_DIR;
+						if (S_ISREG(entrystat.st_mode)) de->d_type = DT_REG;
+						else if (S_ISDIR(entrystat.st_mode)) de->d_type = DT_DIR;
 					}
 				}
 			}
@@ -1679,14 +1826,19 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
             }
 
 
+			// Entries such as '.', '..', or short ROM names have no four-byte
+			// suffix. Never form a pointer before the start of d_name.
+			const size_t name_len = strlen(de->d_name);
+			const char *suffix = name_len >= 4 ? de->d_name + name_len - 4 : "";
 			if (options & SCANO_NEOGEO)
 			{
-				if (de->d_type == DT_REG && !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".zip"))
+				if (de->d_type == DT_REG && !strcasecmp(suffix, ".zip"))
 				{
 					de->d_type = DT_DIR;
+					isZip = 1;
 				}
 
-				if (strcasecmp(de->d_name + strlen(de->d_name) - 4, ".neo"))
+				if (strcasecmp(suffix, ".neo"))
 				{
 					if (de->d_type != DT_DIR) continue;
 				}
@@ -1705,9 +1857,11 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 				memset(&dext, 0, sizeof(dext));
 				memcpy(&dext.de, de, sizeof(dext.de));
 				memcpy(dext.altname, de->d_name, sizeof(dext.altname));
-				if (!strcasecmp(dext.altname + strlen(dext.altname) - 4, ".zip")) dext.altname[strlen(dext.altname) - 4] = 0;
+				if (isZip) {
+					dext.flags |= DT_EXT_ZIP;
+					dext.altname[name_len - 4] = 0;
+				}
 
-				full_path[path_len] = 0;
 				char *altname = neogeo_get_altname(full_path, dext.de.d_name, dext.altname);
 				if (altname)
 				{
@@ -1764,7 +1918,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 					{
 						const char *ext = extension;
 						int found = (has_trd && x2trd_ext_supp(de->d_name));
-						if (!found && !(options & SCANO_NOZIP) && !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".zip") && (options & SCANO_DIR))
+						if (!found && !(options & SCANO_NOZIP) && !strcasecmp(suffix, ".zip") && (options & SCANO_DIR))
 						{
 							// Fake that zip-file is a directory.
 							de->d_type = DT_DIR;
@@ -1773,7 +1927,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 						}
 						if (!found && is_minimig() && !memcmp(extension, "HDF", 3))
 						{
-							found = !strcasecmp(de->d_name + strlen(de->d_name) - 4, ".iso");
+							found = !strcasecmp(suffix, ".iso");
 						}
 
 						char *fext = strrchr(de->d_name, '.');
@@ -1844,7 +1998,7 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		printf("Got %d dir entries\n", flist_nDirEntries());
 		if (!flist_nDirEntries()) return 0;
 
-		std::sort(DirItem.begin(), DirItem.end(), DirentComp());
+		std::sort(DirItem.begin(), DirItem.end(), DirentComp(options));
 		if (file_name[0])
 		{
 			int pos = -1;
@@ -1905,14 +2059,23 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_NEXT_PAGE)
 		{
-			iSelectedEntry += flist_page_step(1);
-			flist_center_selected();
+			if (OsdChinese())
+				OsdListPage(true, flist_nDirEntries(), flist_visible_rows(), iFirstEntry, iSelectedEntry);
+			else {
+				iSelectedEntry += flist_page_step(1);
+				flist_center_selected();
+			}
 			return 0;
 		}
 		else if (mode == SCANF_PREV_PAGE)
 		{
-			iSelectedEntry -= flist_page_step(-1);
-			flist_center_selected();
+			if (OsdChinese())
+				OsdListPage(false, flist_nDirEntries(), flist_visible_rows(), iFirstEntry, iSelectedEntry);
+			else {
+				iSelectedEntry -= flist_page_step(-1);
+				flist_center_selected();
+			}
+			return 0;
 		}
 		else if (mode == SCANF_SET_ITEM)
 		{
@@ -1938,24 +2101,11 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_NEXT_CHAR)
 		{
-			//DirItem is sorted, so just advance until the first character changes.
-			//if we reach the end before that don't change anything.
-			//If we change d_type also consider that 'next'. This means next
-			//advances through directories, and then advances through files
-			//
 			int found = -1;
-			char curdType = DirItem[iSelectedEntry].de.d_type;
-			char curChar = DirItem[iSelectedEntry].altname[0];
-			if ((curChar == '_') && (curdType == DT_DIR) && (options & SCANO_CORES))
-				curChar = DirItem[iSelectedEntry].altname[1];
-			curChar = toupper(curChar);
-
+			const uint32_t current = file_jump_key(DirItem[iSelectedEntry], options);
 			for (int i = iSelectedEntry+1; i < flist_nDirEntries(); i++)
 			{
-				char tryChar = DirItem[i].altname[0];
-				if ((tryChar == '_') && (DirItem[i].de.d_type == DT_DIR) && (options & SCANO_CORES))
-					tryChar = DirItem[i].altname[1];
-				if (toupper(tryChar) != curChar || DirItem[i].de.d_type != curdType)
+				if (file_jump_key(DirItem[i], options) != current)
 				{
 					found = i;
 					break;
@@ -1969,36 +2119,14 @@ int ScanDirectory(char* path, int mode, const char *extension, int options, cons
 		}
 		else if (mode == SCANF_PREV_CHAR)
 		{
-			//Previous seek seeks to the FIRST entry that starts with the previous letter
-			//Search backward until the first char changes, and then continue looking backward
-			//until it changes again.
-
-
 			int found = -1;
-			char curdType = DirItem[iSelectedEntry].de.d_type;
-			bool sawChange = false;
-			char curChar = DirItem[iSelectedEntry].altname[0];
-			if ((curChar == '_') && (curdType == DT_DIR) && (options & SCANO_CORES))
-				curChar = DirItem[iSelectedEntry].altname[1];
-			curChar = toupper(curChar);
-			for (int i = iSelectedEntry-1; i >= 0; i--)
-			{
-				char tryChar = DirItem[i].altname[0];
-				if ((tryChar == '_') && (DirItem[i].de.d_type == DT_DIR) && (options & SCANO_CORES))
-					tryChar = DirItem[i].altname[1];
-				if (toupper(tryChar) != curChar || DirItem[i].de.d_type != curdType)
-				{
-					if (sawChange)
-					{
-						found = i+1;
-						break;
-					}
-					sawChange = true;
-					curChar = DirItem[i].altname[0];
-					if (curChar == '_')
-						curChar = DirItem[i].altname[1];
-					curChar = toupper(curChar);
-				}
+			int first = iSelectedEntry;
+			const uint32_t current = file_jump_key(DirItem[first], options);
+			while (first > 0 && file_jump_key(DirItem[first-1], options) == current) --first;
+			if (first > 0) {
+				const uint32_t previous = file_jump_key(DirItem[first-1], options);
+				while (first > 0 && file_jump_key(DirItem[first-1], options) == previous) --first;
+				found = first;
 			}
 			if (found >= 0)
 			{

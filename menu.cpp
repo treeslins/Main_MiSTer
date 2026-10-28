@@ -67,6 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "ide.h"
 #include "profiling.h"
 #include "str_util.h"
+#include "zh_ui.h"
+#include "cn/path_utils.h"
 #include "autofire.h"
 
 /*menu states*/
@@ -386,9 +388,16 @@ static void ResolveExistingCorePath(char *path)
 	}
 }
 
+static bool append_selection_path(const char *name)
+{
+	if (TryJoinPath(selPath, selPath, name)) return true;
+	printf("File selection rejected: path is too long (%s/%s)\n", selPath, name);
+	return false;
+}
+
 static int changeDir(char *dir)
 {
-	char curdir[128];
+	char curdir[256]; // Preserve a complete dirent name, including UTF-8 bytes.
 	memset(curdir, 0, sizeof(curdir));
 	if(!dir || !strcmp(dir, ".."))
 	{
@@ -416,8 +425,7 @@ static int changeDir(char *dir)
 			return 0;
 		}
 
-		if (strlen(selPath)) strcat(selPath, "/");
-		strcat(selPath, dir);
+		if (!append_selection_path(dir)) return 0;
 	}
 
 	ScanDirectory(selPath, SCANF_INIT, fs_pFileExt, fs_Options);
@@ -448,8 +456,8 @@ void SelectFile(const char* path, const char* pFileExt, int Options, unsigned ch
 		strcpy(selPath, get_rbf_dir());
 		if (strlen(get_rbf_name()))
 		{
-			if(strlen(selPath)) strcat(selPath, "/");
-			strcat(selPath, get_rbf_name());
+			// An overlong remembered name must not prevent opening the list.
+			append_selection_path(get_rbf_name());
 		}
 		ResolveExistingCorePath(selPath);
 		pFileExt = "RBFMRAMGL";
@@ -738,6 +746,21 @@ static void infowrite(int pos, const char* txt)
 	OsdWrite(pos, str, 0, 0);
 }
 
+static void printChineseVideoInfo(int row, const char *label, const char *description)
+{
+	char resolution[16], frequency[16], refresh[16], line[64];
+	if (sscanf(description, "%15s %15s %15s", resolution, frequency, refresh) == 3)
+	{
+		// Five Hanzi plus ':' occupy 66px. These fixed ASCII fields fill
+		// the remaining 168px and right-align each value in its own column.
+		snprintf(line, sizeof(line), "%s%10.10s%10.10s%8.8s", label, resolution, frequency, refresh);
+	}
+	else snprintf(line, sizeof(line), "%s%s", label, description);
+	// Preserve the padding of the three fixed-width columns. Translation
+	// normally folds repeated spaces before drawing a menu row.
+	OsdWriteOffset(row, line, 0, 0, 0, 0, 0, 32, 0, false);
+}
+
 static void printSysInfo()
 {
 	if (!sysinfo_timer || CheckTimer(sysinfo_timer))
@@ -749,6 +772,40 @@ static void printSysInfo()
 		static int flip = 0;
 
 		char str[40];
+		if (OsdChinese())
+		{
+			// The 16px Chinese viewport has seven body rows plus the exit row.
+			// Keep status in rows 0-3 and controls in rows 4-6, without the
+			// legacy 8px box drawing characters or hidden scroll pages.
+			char line[64];
+			const char *ethernet = getNet(1);
+			snprintf(line, sizeof(line), "有线连接IP: %s", ethernet ? ethernet + 4 : "未连接");
+			OsdWrite(0, line);
+			const char *wifi = getNet(2);
+			snprintf(line, sizeof(line), "无线连接IP: %s", wifi ? wifi + 4 : "未连接");
+			OsdWrite(1, line);
+
+			flip = (flip + 1) & 3;
+			if (hasbat && (flip & 2))
+			{
+				if (bat.capacity >= 0) snprintf(line, sizeof(line), "电量:%d%%", bat.capacity);
+				else snprintf(line, sizeof(line), "电量:n/a");
+				OsdWrite(2, line);
+				if (bat.load_current > 0) snprintf(line, sizeof(line), "充电:%dmA", bat.load_current);
+				else if (bat.load_current < -1) snprintf(line, sizeof(line), "放电:%dmA", -bat.load_current);
+				else snprintf(line, sizeof(line), "Not charging");
+				OsdWrite(3, line);
+			}
+			else
+			{
+				video_mode_adjust(true);
+				video_core_description(str, sizeof(str));
+				printChineseVideoInfo(2, "核心分辨率:", str);
+				video_scaler_description(str, sizeof(str));
+				printChineseVideoInfo(3, "菜单分辨率:", str);
+			}
+			return;
+		}
 		OsdWrite(n++, info_top, 0, 0);
 
 		int j = 0;
@@ -1324,6 +1381,16 @@ void HandleUI(void)
 		}
 	}
 
+	// Inspect text outside the Chinese viewport without changing core options.
+	const bool zh_pageable = menustate==MENU_SYSTEM2 || menustate==MENU_COMMON2 ||
+		menustate==MENU_MISC2 || menustate==MENU_GENERIC_MAIN2 ||
+		menustate==MENU_GENERIC_MAIN3 || menustate==MENU_MINIMIG_MAIN2 ||
+		menustate==MENU_ST_MAIN2 || menustate==MENU_ABOUT2 ||
+		menustate==MENU_SCRIPTS_PRE1;
+	if(OsdChinese() && zh_pageable && user_io_osd_is_visible() && (get_key_mod() & (LCTRL|RCTRL)) &&
+	   (c==KEY_PAGEUP || c==KEY_PAGEDOWN)) {
+		OsdChinesePage(c==KEY_PAGEUP?-1:1); c=0;
+	}
 	//prevent OSD control while script is executing on framebuffer
 	if ((!video_fb_state() || video_chvt(0) != 2) && !select_ini)
 	{
@@ -1632,7 +1699,9 @@ void HandleUI(void)
 				}
 				else if (is_menu())
 				{
-					menusub = 6;
+					// The initial core list returns here when Menu/Home is pressed.
+					// Focus the first setting instead of the Exit footer.
+					menusub = 0;
 					SelectFile("", 0, SCANO_CORES, MENU_CORE_FILE_SELECTED1, MENU_SYSTEM1);
 				}
 				else if (is_minimig())
@@ -4034,7 +4103,7 @@ void HandleUI(void)
 		}
 		parentstate = MENU_MISC1;
 
-		OsdWrite(1, "         Information");
+		if (!OsdChinese()) OsdWrite(1, "         Information");
 
 		if (menusub != 0) flag = (flag & 0xF) | (altcfg() << 4);
 		strcpy(s, " Config:");
@@ -4052,12 +4121,12 @@ void HandleUI(void)
 		}
 		strcat(s, " ");
 		if (m) strcat(s, "\xc");
-		OsdWrite(10, s, menusub == 0);
+		OsdWrite(OsdChinese() ? 4 : 10, s, menusub == 0);
 
 		m = get_core_volume();
 		{
 			strcpy(s, "     Core Volume: ");
-			if (audio_filter_en() >= 0) s[4] = 0x1b;
+			if (!OsdChinese() && audio_filter_en() >= 0) s[4] = 0x1b;
 			memset(s + strlen(s), 0, 11);
 			char *bar = s + strlen(s);
 			memset(bar, 0x8C, 8);
@@ -4065,7 +4134,7 @@ void HandleUI(void)
 			if (m & 0x60) bar[8] = '+';
 			if (m & 0x40) bar[9] = '+';
 		}
-		OsdWrite(12, s, menusub == 1);
+		OsdWrite(OsdChinese() ? 5 : 12, s, menusub == 1);
 
 		old_volume = get_volume();
 		strcpy(s, "   Global Volume: ");
@@ -4081,7 +4150,7 @@ void HandleUI(void)
 			memset(bar, 0x8C, 8 - vol);
 			memset(bar, 0x7f, 8 - vol - old_volume);
 		}
-		OsdWrite(13, s, menusub == 2);
+		OsdWrite(OsdChinese() ? 6 : 13, s, menusub == 2);
 
 		OsdWrite(15, STD_EXIT, menusub == 3, 0, OSD_ARROW_RIGHT);
 		break;
@@ -4525,14 +4594,19 @@ void HandleUI(void)
 	case MENU_ABOUT2:
 		StarsUpdate();
 		m = 0;
-		while (m < 10) OsdDrawLogo(m++);
+		// The Chinese logo occupies one 16px row. Keeping the legacy ten
+		// logo rows would push the version and credits outside its viewport.
+		while (m < (OsdChinese() ? 1 : 10)) OsdDrawLogo(m++);
 		OsdWrite(m++, "     www.MiSTerFPGA.org", 0, 0, 1);
 		OsdWrite(m++, "", 0, 0, 1);
-		sprintf(s, "       MiSTer v%s", version + 5);
+		if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s", version + 5);
+		else sprintf(s, "       MiSTer v%s", version + 5);
 		OsdWrite(m++, s, 0, 0, 1);
 
-		s[0] = 0;
+		if (OsdChinese()) OsdWrite(m++, OsdCoreNameGet(), 0, 0, 1);
+		else
 		{
+			s[0] = 0;
 			int len = strlen(OsdCoreNameGet());
 			if (len > 30) len = 30;
 			int sp = (30 - len) / 2;
@@ -4541,8 +4615,8 @@ void HandleUI(void)
 			char *s3 = OsdCoreNameGet();
 			for (int i = 0; i < len; i++) *s2++ = *s3++;
 			*s2++ = 0;
+			OsdWrite(m++, s, 0, 0, 1);
 		}
-		OsdWrite(m++, s, 0, 0, 1);
 		OsdWrite(m++, "", 0, 0, 1);
 		ScrollText(m++, "                                 MiSTer by Alexey Melnikov, based on MiST by Till Harbaum, Minimig by Dennis van Weeren and other projects. MiSTer hardware and software is distributed under the terms of the GNU General Public License version 3. MiSTer FPGA cores are the work of their respective authors under individual licensing. Go to www.MiSTerFPGA.org for more details.", 0, 0, 0, 0);
 
@@ -5564,9 +5638,9 @@ void HandleUI(void)
 				if (strlen(selPath))
 				{
 					strcpy(SelectedDir, selPath);
-					strcat(selPath, "/");
 				}
-				strcat(selPath, flist_SelectedItem()->de.d_name);
+				// Cancelling still works if this name cannot be remembered.
+				append_selection_path(flist_SelectedItem()->de.d_name);
 			}
 
 			if (!strcasecmp(fs_pFileExt, "RBF")) selPath[0] = 0;
@@ -5679,8 +5753,7 @@ void HandleUI(void)
 				if ((fs_Options & SCANO_UMOUNT) && (is_megacd() || is_pce() || is_cdi() || is_neogeo() || (is_psx() && !(fs_Options & SCANO_SAVES)) || is_saturn() || is_3do()) && type == DT_DIR && strcmp(flist_SelectedItem()->de.d_name, ".."))
 				{
 					int len = strlen(selPath);
-					strcat(selPath, "/");
-					strcat(selPath, name);
+					if (!append_selection_path(name)) break;
 					int num = ScanDirectory(selPath, SCANF_INIT, fs_pFileExt, 0);
 					if (num != 1) selPath[len] = 0;
 					else
@@ -5703,17 +5776,16 @@ void HandleUI(void)
 						if (strlen(selPath))
 						{
 							strcpy(SelectedDir, selPath);
-							strcat(selPath, "/");
 						}
 						strcpy(SelectedLabel, flist_SelectedItem()->altname);
 						if (fs_Options & SCANO_CORES)
 						{
 							int len = strlen(SelectedLabel);
-							if (SelectedLabel[len - 4] == '.') SelectedLabel[len - 4] = 0;
+							if (len > 4 && SelectedLabel[len - 4] == '.') SelectedLabel[len - 4] = 0;
 							char *p = strstr(SelectedLabel, "_20");
 							if (p) *p = 0;
 						}
-						strcat(selPath, name);
+						if (!append_selection_path(name)) break;
 						menustate = fs_MenuSelect;
 						helptext_idx = 0;
 					}
@@ -7318,13 +7390,17 @@ void HandleUI(void)
 		menumask = 0x7F;
 
 		OsdWrite(m++);
-		sprintf(s, "       MiSTer v%s", version + 5);
+		if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s", version + 5);
+		else sprintf(s, "       MiSTer v%s", version + 5);
 		{
 			char str[8] = {};
 			FILE *f = fopen("/MiSTer.version", "r");
 			if (f)
 			{
-				if (fread(str, 6, 1, f)) sprintf(s, " MiSTer v%s,  OS v%s", version + 5, str);
+				if (fread(str, 6, 1, f)) {
+					if (OsdChinese()) snprintf(s, sizeof(s), "MiSTerFPGA.cn v%s, OS v%s", version + 5, str);
+					else sprintf(s, " MiSTer v%s,  OS v%s", version + 5, str);
+				}
 				fclose(f);
 			}
 		}
@@ -8333,8 +8409,34 @@ void open_joystick_setup()
 	joymap_first = 1;
 }
 
+static std::string chinese_file_label(int index)
+{
+	auto item=flist_DirItem(index);
+	const char *name=item->altname;
+	if(item->de.d_type==DT_DIR && !strcmp(name,"..")) return u8"上级目录";
+	if(item->de.d_type==DT_DIR && (fs_Options & SCANO_CORES) && name[0]=='_') ++name;
+	std::string label=name;
+	if(item->de.d_type!=DT_DIR && !cfg.rbf_hide_datecode && item->datecode[0]) label+=" "+std::string(item->datecode);
+	return label;
+}
+
+static const char *chinese_file_right_label(int index)
+{
+	auto item=flist_DirItem(index);
+	if(item->de.d_type!=DT_DIR || !strcmp(item->altname,"..")) return "";
+	return item->flags & DT_EXT_ZIP?"[ZIP]":u8"[目录]";
+}
+
 void ScrollLongName(void)
 {
+	if(OsdChinese()) {
+		if(flist_nDirEntries()) {
+			std::string label=chinese_file_label(flist_iSelectedEntry());
+			ScrollText(flist_iSelectedEntry()-flist_iFirstEntry(),label.c_str(),0,0,0,1,0,false,
+			           chinese_file_right_label(flist_iSelectedEntry()));
+		}
+		return;
+	}
 	// this function is called periodically when file selection window is displayed
 	// it checks if predefined period of time has elapsed and scrolls the name if necessary
 
@@ -8372,6 +8474,28 @@ void ScrollLongName(void)
 // print directory contents
 void PrintDirectory(int expand)
 {
+	if(OsdChinese()) {
+		ScrollReset();
+		const int visible_rows=OsdGetVisibleRows();
+		for(int i=0;i<visible_rows;++i) {
+			int k=flist_iFirstEntry()+i;
+			std::string label;
+			const char *right_label="";
+			bool raw=true;
+			if(k<flist_nDirEntries()) {
+				label=chinese_file_label(k);
+				right_label=chinese_file_right_label(k);
+			}
+			else if(!flist_nDirEntries() && i==0) { label="No files!"; raw=false; }
+			else if(!flist_nDirEntries() && home_dir && !filter[0]) {
+				if(i==1) { label="Missing directory:"; raw=false; }
+				if(i==2) label=home_dir;
+			}
+			char marker=(!i && k)?17:(i==visible_rows-1 && k+1<flist_nDirEntries())?16:0;
+			OsdWriteOffset(i,label.c_str(),k==flist_iSelectedEntry() && k<flist_nDirEntries(),0,0,marker,0,32,0,!raw,right_label);
+		}
+		return;
+	}
 	char s[40];
 	ScrollReset();
 
@@ -8499,6 +8623,7 @@ void PrintDirectory(int expand)
 
 static void set_text(const char *message, unsigned char code)
 {
+	if(OsdChinese()) { OsdWriteText(message,code); return; }
 	char s[40];
 	int i = 0, l = 1;
 
