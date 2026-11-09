@@ -2,7 +2,7 @@ name: MiSTer CN - complete upstream integration
 
 on:
   schedule:
-    - cron: '27 3 * * *'
+    - cron: '17 3,15 * * *'
   workflow_dispatch:
   pull_request:
     paths:
@@ -48,7 +48,8 @@ jobs:
           git fetch --no-tags https://github.com/MiSTer-devel/Main_MiSTer.git master
           echo "UPSTREAM_SHA=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
           echo "UPSTREAM_DATE=$(TZ=UTC git show -s --format=%cd --date=format-local:%Y.%m.%d FETCH_HEAD)" >> "$GITHUB_ENV"
-          git merge --no-commit --no-ff FETCH_HEAD
+          git merge --no-edit --no-ff FETCH_HEAD
+          echo "TESTED_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Verify fixed misterfpga.cn and copy it verbatim
         shell: bash
@@ -120,16 +121,25 @@ jobs:
           cp cn/assets/LICENSE-OFL dist/LICENSE-OFL
           cp LICENSE dist/LICENSE-MISTER
           # Capture the exact staged upstream merge against the checked-out Chinese revision.
-          git diff --cached --binary > dist/upstream-merge.patch
+          git diff --binary "$GITHUB_SHA" HEAD > dist/upstream-merge.patch
           {
             echo "UPSTREAM_SHA=$UPSTREAM_SHA"
             echo "UPSTREAM_DATE=$UPSTREAM_DATE"
             echo "CHINESE_SHA=$GITHUB_SHA"
+            echo "TESTED_SHA=$TESTED_SHA"
             echo "FONT_SHA256=$(sha256sum cn/assets/misterfpga.cn | cut -d' ' -f1)"
             echo "FONT_REGENERATED=NO"
             echo "UPSTREAM_MERGE_PATCH_SHA256=$(sha256sum dist/upstream-merge.patch | cut -d' ' -f1)"
             ( cd dist && sha256sum MiSTer misterfpga.cn coverage.json )
           } > dist/manifest.txt
+
+      - name: Transfer verified commit
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+        run: |
+          if [[ "$TESTED_SHA" != "$GITHUB_SHA" ]]; then
+            git branch tested-source HEAD
+            git bundle create dist/tested.bundle refs/heads/tested-source ^"$GITHUB_SHA"
+          fi
 
       - name: Upload successful build only
         uses: actions/upload-artifact@v4
@@ -142,11 +152,14 @@ jobs:
   publish:
     name: Publish dated Chinese release after successful build
     needs: build
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: MiSTer-ZLabs-Chinese
@@ -162,6 +175,12 @@ jobs:
           up_date=$(sed -n 's/^UPSTREAM_DATE=//p' dist/manifest.txt)
           cn=$(sed -n 's/^CHINESE_SHA=//p' dist/manifest.txt)
           [[ "$up" =~ ^[0-9a-f]{40}$ && "$cn" =~ ^[0-9a-f]{40}$ && "$up_date" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}$ ]]
+          tested=$(sed -n 's/^TESTED_SHA=//p' dist/manifest.txt)
+          if [[ "$tested" != "$cn" ]]; then
+            git fetch dist/tested.bundle refs/heads/tested-source
+            test "$(git rev-parse FETCH_HEAD)" = "$tested"
+          fi
+          git push origin "$tested:refs/heads/master"
           latest=$(gh api "repos/$GH_REPO/releases/latest" --jq .tag_name 2>/dev/null || true)
           if [[ -n "$latest" ]]; then
             mkdir -p previous-release
@@ -195,11 +214,11 @@ jobs:
           请先备份原有 MiSTer，再将本发布的 MiSTer 和 misterfpga.cn 一同放到 SD 卡根目录。
           在 MiSTer.ini 中设置 osd_language=0 可切回英文界面。
 
-          标签指向中文源码；upstream-merge.patch 记录构建时合入的上游改动。
+          标签指向通过测试的合并源码；upstream-merge.patch 记录构建时合入的上游改动。
           manifest.txt 提供构建来源与文件散列。
           EOF
           gh release create "$tag" dist/MiSTer dist/misterfpga.cn \
             dist/LICENSE-OFL dist/LICENSE-MISTER dist/coverage.json \
             dist/manifest.txt dist/preview.pgm dist/upstream-merge.patch \
-            --target "$cn" --title "MiSTerFPGA.cn 中文版 v${up_date}${tag#cn-zlabs-v$up_date}" \
+            --target "$tested" --title "MiSTerFPGA.cn 中文版 v${up_date}${tag#cn-zlabs-v$up_date}" \
             --notes-file release-notes.md
