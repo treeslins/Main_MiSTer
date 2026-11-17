@@ -76,6 +76,8 @@
 #define UIO_GET_FR_CNT  0x42  // get frame counter
 #define UIO_GET_F12_MOD 0x43  // get framework menu key modifier
 #define UIO_HDMI_INT    0x44
+#define UIO_GET_FFB     0x45  // get force feedback request from core (player in bits 15:8)
+#define UIO_ATRIG       0x46
 
 // codes as used by 8bit for file loading from OSD
 #define FIO_FILE_TX     0x53
@@ -99,8 +101,8 @@
 #define UIO_MM2_FLP     0xF7 //0x44
 #define UIO_MM2_HDD     0xF8 //0x54
 #define UIO_MM2_JOY     0xF9 //0x64
-#define UIO_MM2_FLPEX01 0xFA 
-#define UIO_MM2_FLPEX23 0xFB 
+#define UIO_MM2_FLPEX01 0xFA
+#define UIO_MM2_FLPEX23 0xFB
 #define UIO_MM2_USRPORT 0xFC
 
 #define JOY_RIGHT       0x01
@@ -159,7 +161,6 @@
 // core type value should be unlikely to be returned by broken cores
 #define CORE_TYPE_UNKNOWN   0x55
 #define CORE_TYPE_8BIT      0xa4   // generic core
-#define CORE_TYPE_SHARPMZ   0xa7   // Sharp MZ Series
 #define CORE_TYPE_8BIT2     0xa8   // generic core using dual SDRAM
 
 #define EMU_NONE  0
@@ -168,6 +169,10 @@
 #define EMU_JOY1  3
 
 #define UIO_BUFFER_SIZE 16384
+
+typedef int (*sd_service_t)(int disk, fileTYPE *f, int op, uint64_t lba, int sz, int ack);
+extern sd_service_t sd_service;
+extern void (*core_poll)();
 
 void user_io_init(const char *path, const char *xml);
 unsigned char user_io_core_type();
@@ -178,6 +183,7 @@ char user_io_user_button();
 void user_io_osd_key_enable(char);
 int user_io_get_kbd_reset();
 void user_io_set_kbd_reset(int reset);
+void user_io_set_kbd_led(int led, int state);
 
 int substrcpy(char *d, const char *s, char idx);
 
@@ -193,7 +199,7 @@ void user_io_status_reset();
 
 uint32_t user_io_get_file_crc();
 void user_io_write_gameid(const char *filename, uint32_t crc32_val = 0, const char *product_code = NULL);
-int  user_io_file_mount(const char *name, unsigned char index = 0, char pre = 0, int pre_size = 0);
+int  user_io_file_mount(const char *name, unsigned char index = 0, char pre = 0, int pre_size = 0, int image = 0);
 void user_io_bufferinvalidate(unsigned char index);
 char *user_io_make_filepath(const char *path, const char *filename);
 char *user_io_get_core_name(int orig = 0);
@@ -216,6 +222,7 @@ int user_io_get_joy_transl();
 void user_io_digital_joystick(unsigned char, uint32_t, int);
 void user_io_l_analog_joystick(unsigned char, char, char);
 void user_io_r_analog_joystick(unsigned char, char, char);
+void user_io_analog_triggers(unsigned char, uint8_t, uint8_t);
 void user_io_set_joyswap(int swap);
 int user_io_get_joyswap();
 char user_io_osd_is_visible();
@@ -239,7 +246,7 @@ int user_io_get_width();
 
 void user_io_check_reset(unsigned short modifiers, char useKeys);
 
-void user_io_rtc_reset();
+void user_io_send_rtc(int type);
 
 const char* get_rbf_dir();
 const char* get_rbf_name();
@@ -272,34 +279,9 @@ void diskled_on();
 #define DISKLED_ON  diskled_on()
 #define DISKLED_OFF void()
 
-char is_minimig();
-char is_next();
-char is_sharpmz();
 char is_menu();
-char is_x86();
-char is_snes();
-char is_sgb();
-char is_apple2();
-char user_io_a2_woz_enabled();
-char is_neogeo();
-char is_neogeo_cd();
-char is_megacd();
-char is_pce();
-char is_archie();
-char is_gba();
-char is_c64();
-char is_c128();
-char is_st();
-char is_psx();
-char is_cdi();
 char is_arcade();
-char is_saturn();
-char is_pcxt();
-char is_n64();
-char is_uneon();
-char is_atari800();
-char is_atari5200();
-char is_3do();
+char user_io_a2_woz_enabled();
 
 #define HomeDir(x) user_io_get_core_path(x)
 #define CoreName user_io_get_core_name()

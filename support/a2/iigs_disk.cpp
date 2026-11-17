@@ -315,21 +315,41 @@ int iigs_mount(int index, const char *name, fileTYPE *f, int *out_writable)
 	return IIGS_HANDLED;
 }
 
-void iigs_read(int disk, fileTYPE *f, uint64_t lba, int ack)
+int iigs_sd_service(int disk, fileTYPE *f, int op, uint64_t lba, int sz, int ack)
 {
-	uint8_t chunk[512];
+	if (op == 2) iigs_write(disk, f, lba, ack);
+	else if (op & 1) iigs_read(disk, f, lba, sz / 512, ack);
+	else return -1;
+	return 1;
+}
+
+void iigs_read(int disk, fileTYPE *f, uint64_t lba, uint32_t blks, int ack)
+{
+	// Serve the whole request, as the generic SD path does: the IIgs WOZ
+	// controller asks for up to 32 blocks per track read. Blocks past the end
+	// of the image are zero; a final partial block keeps the bytes it has
+	// (WOZ1 images, e.g. Karateka, end with track data in a partial block).
+	static uint8_t buf[UIO_BUFFER_SIZE];
+	if (blks < 1) blks = 1;
+	if (blks > sizeof(buf) / 512) blks = sizeof(buf) / 512;
+	uint32_t sz = blks * 512;
+	memset(buf, 0, sz);
+
 	if (g_mode[disk] == 1) {
 		uint64_t off = lba * 512;
-		if (g_woz[disk] && off + 512 <= g_woz_sz[disk]) memcpy(chunk, g_woz[disk] + off, 512);
-		else memset(chunk, 0, 512);
+		if (g_woz[disk] && off < g_woz_sz[disk]) {
+			uint64_t n = g_woz_sz[disk] - off;
+			memcpy(buf, g_woz[disk] + off, n < sz ? (size_t)n : sz);
+		}
 	} else {
-		if (!(FileSeek(f, (int64_t)(lba * 512 + g_hdr_off[disk]), SEEK_SET) &&
-		      FileReadAdv(f, chunk, 512) > 0))
-			memset(chunk, 0, 512);
+		if (FileSeek(f, (int64_t)(lba * 512 + g_hdr_off[disk]), SEEK_SET)) {
+			int r = FileReadAdv(f, buf, sz);
+			if (r < 0) memset(buf, 0, sz);
+		}
 	}
 	EnableIO();
 	spi_w(UIO_SECTOR_RD | ack);
-	spi_block_write(chunk, user_io_get_width(), 512);
+	spi_block_write(buf, user_io_get_width(), sz);
 	DisableIO();
 }
 
@@ -388,4 +408,11 @@ void iigs_write(int disk, fileTYPE *f, uint64_t lba, int ack)
 				FileWriteAdv(f, out, A2_TRACK_SIZE);
 		}
 	}
+}
+
+char is_apple2()
+{
+	static int is_apple2_type = 0;
+	if (!is_apple2_type) is_apple2_type = strcasecmp(user_io_get_core_name(1), "Apple-II") ? 2 : 1;
+	return (is_apple2_type == 1);
 }

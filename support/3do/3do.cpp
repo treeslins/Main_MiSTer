@@ -75,6 +75,30 @@ static void p3do_get_save_without_disk(char *path)
 	}
 }
 
+// The 3DO OS keeps a file system in the NVRAM. A missing or empty save file is served as a blank
+// volume (p3do_fill_blanksave), but a file without the volume label (zero-filled or foreign) is
+// loaded as it is: the FZ-1 BIOS does not format it, and games then report the NVRAM as full.
+// Such a file gets the blank volume before it is mounted.
+static void p3do_format_save(const char *path)
+{
+	static uint8_t nvram[32 * 1024];
+	uint8_t blank[512];
+	fileTYPE f;
+
+	if (!FileOpen(&f, path, 1)) return;
+	int len = (f.size > 0 && f.size <= (int)sizeof(nvram)) ? FileReadAdv(&f, nvram, 7) : 0;
+	FileClose(&f);
+	if (len != 7) return;
+
+	p3do_fill_blanksave(blank, 0);
+	if (!memcmp(nvram, blank, 7)) return;
+
+	printf("3DO: %s holds no NVRAM volume, formatting it.\n", path);
+	memset(nvram, 0, sizeof(nvram));
+	memcpy(nvram, blank, sizeof(blank));
+	FileSave(path, nvram, sizeof(nvram));
+}
+
 static void p3do_mount_save(const char *filename)
 {
 	user_io_set_index(SAVE_IO_INDEX);
@@ -83,6 +107,7 @@ static void p3do_mount_save(const char *filename)
 	{
 		FileGenerateSavePath(filename, buf);
 		p3do_get_save_without_disk(buf);
+		p3do_format_save(buf);
 #ifdef P3DO_DEBUG
 		printf("Saturn save filename = %s\n", buf);
 #endif // P3DO_DEBUG
@@ -227,3 +252,14 @@ void p3do_fill_blanksave(uint8_t *buf, uint32_t lba)
 	}
 }
 
+
+char is_3do()
+{
+	static int is_3do_type = 0;
+	if (!is_3do_type)
+	{
+		is_3do_type = strcasecmp(user_io_get_core_name(1), "3DO") ? 2 : 1;
+		if (is_3do_type == 1) core_poll = p3do_poll;
+	}
+	return (is_3do_type == 1);
+}
