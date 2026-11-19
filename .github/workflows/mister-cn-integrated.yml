@@ -122,6 +122,9 @@ jobs:
           cp LICENSE dist/LICENSE-MISTER
           # Capture the exact staged upstream merge against the checked-out Chinese revision.
           git diff --binary "$GITHUB_SHA" HEAD > dist/upstream-merge.patch
+          if [[ ! -s dist/upstream-merge.patch ]]; then
+            echo "# Upstream already integrated; no additional merge changes." > dist/upstream-merge.patch
+          fi
           {
             echo "UPSTREAM_SHA=$UPSTREAM_SHA"
             echo "UPSTREAM_DATE=$UPSTREAM_DATE"
